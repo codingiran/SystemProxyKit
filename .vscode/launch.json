@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:SystemProxyKit}",
+            "name": "Debug sysproxy",
+            "program": "${workspaceFolder:SystemProxyKit}/.build/debug/sysproxy",
+            "preLaunchTask": "swift: Build Debug sysproxy"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:SystemProxyKit}",
+            "name": "Release sysproxy",
+            "program": "${workspaceFolder:SystemProxyKit}/.build/release/sysproxy",
+            "preLaunchTask": "swift: Build Release sysproxy"
+        }
+    ]
+}

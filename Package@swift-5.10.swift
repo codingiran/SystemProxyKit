@@ -14,6 +14,13 @@ let package = Package(
             name: "SystemProxyKit",
             targets: ["SystemProxyKit"]
         ),
+        .executable(
+            name: "sysproxy",
+            targets: ["sysproxy"]
+        ),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.6.2"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -27,6 +34,13 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("SystemConfiguration"),
                 .linkedFramework("Security"),
+            ]
+        ),
+        .executableTarget(
+            name: "sysproxy",
+            dependencies: [
+                "SystemProxyKit",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .testTarget(
