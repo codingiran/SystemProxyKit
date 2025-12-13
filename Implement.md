@@ -69,25 +69,40 @@ graph TD
 
 数据层是纯净的 Swift Struct，不包含任何 SystemConfiguration 的引用，便于上层 UI 绑定和测试。
 
+> **线程安全：** 所有数据模型均遵循 `Sendable` 协议，确保在 Swift Concurrency 环境下安全传递。
+
 ### 3.1 `ProxyServer`
 
-描述单个代理服务器节点。
+描述单个代理服务器节点，支持可选的认证信息。
 
 | 属性 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `host` | `String` | 主机名或 IP 地址 |
-| `port` | `Int` | 端口号 (PAC 模式下此字段可能被忽略) |
+| `port` | `Int` | 端口号 |
+| `isEnabled` | `Bool` | 开关状态 |
+| `username` | `String?` | 认证用户名（可选） |
+| `password` | `String?` | 认证密码（可选，建议使用 Keychain 安全存储） |
+
+> **安全提示：** 密码字段在序列化时需特别注意，建议通过 `Security.framework` 存入 Keychain，仅保存引用。
+
+### 3.2 `PACConfiguration`
+
+描述 PAC (Proxy Auto-Configuration) 自动代理配置，独立于 `ProxyServer`。
+
+| 属性 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `url` | `URL` | PAC 脚本的 URL 地址 |
 | `isEnabled` | `Bool` | 开关状态 |
 
-### 3.2 `ProxyConfiguration`
+### 3.3 `ProxyConfiguration`
 
-描述完整的网络服务代理配置（对应截图 UI）。
+描述完整的网络服务代理配置（对应系统偏好设置 UI）。
 
 | 属性 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | **Automatic** | | |
 | `autoDiscoveryEnabled` | `Bool` | 自动发现代理 (WPAD) |
-| `autoConfigScript` | `ProxyServer?` | 自动代理配置 (PAC)，利用 host 存储 URL |
+| `autoConfigURL` | `PACConfiguration?` | 自动代理配置 (PAC) |
 | **Manual** | | |
 | `httpProxy` | `ProxyServer?` | 网页代理 (HTTP) |
 | `httpsProxy` | `ProxyServer?` | 安全网页代理 (HTTPS) |
@@ -96,7 +111,26 @@ graph TD
 | `excludeSimpleHostnames`| `Bool` | 不包括简单主机名 |
 | `exceptionList` | `[String]` | 忽略的主机与域列表 |
 
-> **设计决策：** `ProxyConfiguration` 必须遵循 `Equatable` 协议，以便业务层在保存前对比配置是否真的发生了变化。
+> **设计决策：**
+> - `ProxyConfiguration` 必须遵循 `Equatable` 和 `Sendable` 协议。
+> - 本库**不支持** FTP 代理和 RTSP 流式代理（使用场景极少，已逐渐废弃）。
+
+### 3.4 `RetryPolicy`
+
+描述操作失败时的重试策略，供调用方自定义。
+
+| 属性 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `maxRetries` | `Int` | 最大重试次数（默认 3） |
+| `delay` | `TimeInterval` | 重试间隔（秒，默认 0.5） |
+| `backoffMultiplier` | `Double` | 退避倍数（默认 2.0，指数退避） |
+
+```swift
+// 预设策略
+static let none = RetryPolicy(maxRetries: 0, delay: 0, backoffMultiplier: 1.0)
+static let `default` = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
+static let aggressive = RetryPolicy(maxRetries: 5, delay: 0.2, backoffMultiplier: 1.5)
+```
 
 -----
 
@@ -117,11 +151,13 @@ graph TD
 
 ## 5\. 核心逻辑设计 (Core Logic)
 
+> **并发模型：** 核心控制器使用 Swift Concurrency (`async/await`) 实现，所有公开 API 均为 `async throws`。
+
 ### 5.1 `NetworkServiceHelper`
 
-**职责：** 屏蔽 `SCNetworkService` 的查找细节。
+**职责：** 屏蔽 `SCNetworkService` 的查找细节。遵循 `Sendable` 协议。
 
-  * **API:** `findService(byName: String, in: SCPreferences) -> SCNetworkService?`
+  * **API:** `func findService(byName: String, in: SCPreferences) -> SCNetworkService?`
   * **逻辑：** 遍历系统所有服务，对比 `SCNetworkServiceGetName`。
   * **扩展性：** 未来可扩展为通过 BSD Name (如 `en0`) 查找。
 
@@ -129,12 +165,14 @@ graph TD
 
 **职责：** 事务管理、权限上下文持有、API 暴露。
 
+**线程安全：** 使用 `actor` 或内部串行队列确保并发安全，遵循 `Sendable` 约束。
+
 #### 关键方法设计
 
 **1. 获取当前配置 (快照)**
 
 ```swift
-func retrieveCurrentSettings(for interface: String) throws -> ProxyConfiguration
+func getConfiguration(for interface: String) async throws -> ProxyConfiguration
 ```
 
   * **步骤：**
@@ -147,19 +185,35 @@ func retrieveCurrentSettings(for interface: String) throws -> ProxyConfiguration
 **2. 应用配置 (覆盖)**
 
 ```swift
-func setProxy(for interface: String, configuration: ProxyConfiguration, authRef: AuthorizationRef? = nil) throws
+func setProxy(
+    for interface: String,
+    configuration: ProxyConfiguration,
+    authRef: AuthorizationRef? = nil,
+    retryPolicy: RetryPolicy = .default
+) async throws
 ```
 
   * **前置条件：** 进程必须拥有 Root 权限 或 提供了有效的 `authRef`。
   * **步骤：**
     1.  `SCPreferencesCreateWithAuthorization` 创建会话。
     2.  `SCPreferencesLock` **(关键点：必须锁定)**。
+       - 若锁定失败，根据 `retryPolicy` 进行重试（支持指数退避）。
     3.  获取服务与 Protocol。
     4.  调用 Mapping 层生成字典。
     5.  `SCNetworkProtocolSetConfiguration` 写入内存。
     6.  `SCPreferencesCommitChanges` 提交到数据库。
     7.  `SCPreferencesApplyChanges` 通知系统生效。
     8.  `SCPreferencesUnlock` 解锁。
+
+**3. 便捷静态方法**
+
+```swift
+// 快速获取当前配置
+static func current(for interface: String) async throws -> ProxyConfiguration
+
+// 快速设置代理
+static func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
+```
 
 -----
 
@@ -179,13 +233,47 @@ func setProxy(for interface: String, configuration: ProxyConfiguration, authRef:
 
 ## 7\. 业务流程示例 (Business Workflow)
 
-这是业务方使用此库时的标准 **“安全修改模式”**：
+这是业务方使用此库时的标准 **"安全修改模式"**：
 
-1.  **Init:** 初始化 `SystemProxyManager`。
-2.  **Backup:** 调用 `retrieveCurrentSettings("Wi-Fi")` 拿到 `originalConfig` 并保存在内存中。
-3.  **Modify:** 创建新的 `ProxyConfiguration`，设置 host/port。
-4.  **Apply:** 调用 `setProxy("Wi-Fi", newConfig)`。
-5.  **Restore (Optional):** 当业务结束或用户点击“断开连接”时，调用 `setProxy("Wi-Fi", originalConfig)`。
+```swift
+import SystemProxyKit
+
+// 1. 备份当前配置
+let originalConfig = try await SystemProxyKit.current(for: "Wi-Fi")
+
+// 2. 创建新配置
+let newProxy = ProxyServer(
+    host: "127.0.0.1",
+    port: 7890,
+    isEnabled: true,
+    username: nil,
+    password: nil
+)
+var newConfig = originalConfig
+newConfig.httpProxy = newProxy
+newConfig.httpsProxy = newProxy
+
+// 3. 应用配置（带自定义重试策略）
+try await SystemProxyKit.setProxy(
+    newConfig,
+    for: "Wi-Fi",
+    retryPolicy: .default
+)
+
+// 4. 恢复原始配置（当业务结束时）
+try await SystemProxyKit.setProxy(originalConfig, for: "Wi-Fi")
+```
+
+### PAC 配置示例
+
+```swift
+var config = try await SystemProxyKit.current(for: "Wi-Fi")
+config.autoConfigURL = PACConfiguration(
+    url: URL(string: "http://example.com/proxy.pac")!,
+    isEnabled: true
+)
+try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
+```
 
 -----
 
@@ -194,3 +282,17 @@ func setProxy(for interface: String, configuration: ProxyConfiguration, authRef:
 1.  **多网卡并发：** 目前设计是针对单网卡（Interface String）。如果用户同时插网线和连 Wi-Fi，可能需要策略去决定修改哪个（通常修改 Active 且优先级最高的）。
 2.  **权限上下文：** 虽然库不负责实现 XPC，但 API 设计中预留了 `authRef` 入口，确保未来接入 `Security.framework` 时无需破坏性重构 API。
 3.  **IPv6 支持：** 确认 `SystemConfiguration` 中对于 IPv6 字面量地址的解析是否存在坑（通常由系统底层处理，但需留意）。
+4.  **Keychain 集成：** 代理认证密码的安全存储需要后续版本集成 Keychain 服务，当前版本暂时使用内存存储。
+
+---
+
+## 9\. 协议遵循清单 (Protocol Conformance)
+
+| 类型 | 遵循的协议 |
+| :--- | :--- |
+| `ProxyServer` | `Equatable`, `Hashable`, `Sendable`, `Codable` |
+| `PACConfiguration` | `Equatable`, `Hashable`, `Sendable`, `Codable` |
+| `ProxyConfiguration` | `Equatable`, `Sendable`, `Codable` |
+| `RetryPolicy` | `Equatable`, `Sendable` |
+| `SystemProxyError` | `Error`, `Sendable` |
+| `SystemProxyManager` | `Sendable` (通过 `actor` 或内部同步机制) |
