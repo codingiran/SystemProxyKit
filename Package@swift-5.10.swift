@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 5.10
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -20,6 +20,10 @@ let package = Package(
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "SystemProxyKit",
+            swiftSettings: [
+                // Enable strict concurrency checking for Swift 5.10
+                .enableUpcomingFeature("StrictConcurrency"),
+            ],
             linkerSettings: [
                 .linkedFramework("SystemConfiguration"),
                 .linkedFramework("Security"),
@@ -30,5 +34,5 @@ let package = Package(
             dependencies: ["SystemProxyKit"]
         ),
     ],
-    swiftLanguageModes: [.v6]
+    swiftLanguageVersions: [.v5]
 )
