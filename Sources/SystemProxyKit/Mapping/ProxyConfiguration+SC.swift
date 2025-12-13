@@ -11,9 +11,9 @@ import SystemConfiguration
 // MARK: - Deserialization (Dictionary -> Model)
 
 public extension ProxyConfiguration {
-    /// 从 SCNetworkProtocol 返回的字典创建 ProxyConfiguration
-    /// - Parameter dictionary: 代理配置字典
-    /// - Returns: ProxyConfiguration 实例
+    /// Creates ProxyConfiguration from dictionary returned by SCNetworkProtocol
+    /// - Parameter dictionary: Proxy configuration dictionary
+    /// - Returns: ProxyConfiguration instance
     init(fromSCDictionary dictionary: [String: Any]) {
         // Auto Discovery (WPAD)
         autoDiscoveryEnabled = dictionary.getBool(forKey: SCProxyKeys.proxyAutoDiscoveryEnable)
@@ -79,8 +79,8 @@ public extension ProxyConfiguration {
 // MARK: - Serialization (Model -> Dictionary)
 
 public extension ProxyConfiguration {
-    /// 将 ProxyConfiguration 转换为 SCNetworkProtocol 可接受的字典
-    /// - Returns: 代理配置字典
+    /// Converts ProxyConfiguration to dictionary accepted by SCNetworkProtocol
+    /// - Returns: Proxy configuration dictionary
     func toSCDictionary() -> [String: Any] {
         var dict: [String: Any] = [:]
 
@@ -135,10 +135,10 @@ public extension ProxyConfiguration {
 // MARK: - Merge Support
 
 public extension ProxyConfiguration {
-    /// 将当前配置与现有字典合并
-    /// 这用于保留原有字典中可能存在的其他配置项，只更新代理相关的部分
-    /// - Parameter existingDict: 现有的配置字典
-    /// - Returns: 合并后的字典
+    /// Merges current configuration with existing dictionary
+    /// Used to preserve other configuration keys while only updating proxy-related settings
+    /// - Parameter existingDict: Existing configuration dictionary
+    /// - Returns: Merged dictionary
     func mergeIntoSCDictionary(_ existingDict: [String: Any]) -> [String: Any] {
         var merged = existingDict
         let proxyDict = toSCDictionary()

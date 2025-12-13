@@ -8,29 +8,29 @@
 import Foundation
 import Security
 
-/// SystemProxyKit 库的统一入口
-/// 提供便捷的静态方法访问常用功能
+/// Unified entry point for SystemProxyKit library
+/// Provides convenient static methods for accessing common functionality
 public enum SystemProxyKit {
     // MARK: - Shared Manager
 
-    /// 共享的代理管理器实例
+    /// Shared proxy manager instance
     public static let shared = SystemProxyManager()
 
     // MARK: - Quick Access API
 
-    /// 快速获取指定网络接口的当前代理配置
-    /// - Parameter interface: 网络接口名称，例如 "Wi-Fi"
-    /// - Returns: 当前的代理配置
+    /// Quickly gets current proxy configuration for specified network interface
+    /// - Parameter interface: Network interface name, e.g., "Wi-Fi"
+    /// - Returns: Current proxy configuration
     /// - Throws: SystemProxyError
     public static func current(for interface: String) async throws -> ProxyConfiguration {
         try await shared.getConfiguration(for: interface)
     }
 
-    /// 快速设置指定网络接口的代理配置
+    /// Quickly sets proxy configuration for specified network interface
     /// - Parameters:
-    ///   - config: 新的代理配置
-    ///   - interface: 网络接口名称
-    ///   - retryPolicy: 重试策略，默认为 .default
+    ///   - config: New proxy configuration
+    ///   - interface: Network interface name
+    ///   - retryPolicy: Retry policy, defaults to .default
     /// - Throws: SystemProxyError
     public static func setProxy(
         _ config: ProxyConfiguration,
@@ -44,31 +44,31 @@ public enum SystemProxyKit {
         )
     }
 
-    /// 获取所有可用的网络服务名称
-    /// - Returns: 网络服务名称列表
+    /// Gets all available network service names
+    /// - Returns: List of network service names
     public static func availableServices() async throws -> [String] {
         try await shared.availableServices()
     }
 
-    /// 获取所有网络服务的详细信息
-    /// - Returns: 网络服务信息列表
+    /// Gets detailed information for all network services
+    /// - Returns: List of network service information
     public static func allServicesInfo() async throws -> [NetworkServiceHelper.ServiceInfo] {
         try await shared.allServicesInfo()
     }
 
     // MARK: - Convenience Methods
 
-    /// 快速禁用所有代理
-    /// - Parameter interface: 网络接口名称
+    /// Quickly disable all proxies
+    /// - Parameter interface: Network interface name
     public static func disableAllProxies(for interface: String) async throws {
         try await shared.disableAllProxies(for: interface)
     }
 
-    /// 快速设置 HTTP/HTTPS 代理
+    /// Quickly set HTTP/HTTPS proxy
     /// - Parameters:
-    ///   - host: 代理主机
-    ///   - port: 代理端口
-    ///   - interface: 网络接口名称
+    ///   - host: Proxy host
+    ///   - port: Proxy port
+    ///   - interface: Network interface name
     public static func setHTTPProxy(
         host: String,
         port: Int,
@@ -77,11 +77,11 @@ public enum SystemProxyKit {
         try await shared.setHTTPProxy(host: host, port: port, for: interface)
     }
 
-    /// 快速设置 SOCKS 代理
+    /// Quickly set SOCKS proxy
     /// - Parameters:
-    ///   - host: 代理主机
-    ///   - port: 代理端口
-    ///   - interface: 网络接口名称
+    ///   - host: Proxy host
+    ///   - port: Proxy port
+    ///   - interface: Network interface name
     public static func setSOCKSProxy(
         host: String,
         port: Int,
@@ -90,10 +90,10 @@ public enum SystemProxyKit {
         try await shared.setSOCKSProxy(host: host, port: port, for: interface)
     }
 
-    /// 快速设置 PAC 自动代理
+    /// Quickly set PAC automatic proxy
     /// - Parameters:
-    ///   - url: PAC 脚本 URL
-    ///   - interface: 网络接口名称
+    ///   - url: PAC script URL
+    ///   - interface: Network interface name
     public static func setPACProxy(
         url: URL,
         for interface: String
@@ -104,5 +104,5 @@ public enum SystemProxyKit {
 
 // MARK: - Re-exports
 
-// 导出所有公开类型，方便使用者只需 import SystemProxyKit
+// Export all public types for convenience when importing SystemProxyKit
 public typealias ProxyError = SystemProxyError

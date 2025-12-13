@@ -8,14 +8,14 @@
 import Foundation
 import SystemConfiguration
 
-/// 网络服务查找辅助工具
-/// 负责屏蔽 SCNetworkService 的查找细节
+/// Network service lookup helper
+/// Abstracts away SCNetworkService lookup details
 public enum NetworkServiceHelper: Sendable {
-    /// 通过服务名称查找网络服务
+    /// Finds network service by service name
     /// - Parameters:
-    ///   - name: 服务名称，例如 "Wi-Fi" 或 "Ethernet"
-    ///   - prefs: SCPreferences 会话
-    /// - Returns: 匹配的 SCNetworkService，如果未找到则返回 nil
+    ///   - name: Service name, e.g., "Wi-Fi" or "Ethernet"
+    ///   - prefs: SCPreferences session
+    /// - Returns: Matching SCNetworkService, or nil if not found
     public static func findService(
         byName name: String,
         in prefs: SCPreferences
@@ -35,11 +35,11 @@ public enum NetworkServiceHelper: Sendable {
         return nil
     }
 
-    /// 通过 BSD 名称查找网络服务
+    /// Finds network service by BSD name
     /// - Parameters:
-    ///   - bsdName: BSD 设备名称，例如 "en0" 或 "en1"
-    ///   - prefs: SCPreferences 会话
-    /// - Returns: 匹配的 SCNetworkService，如果未找到则返回 nil
+    ///   - bsdName: BSD device name, e.g., "en0" or "en1"
+    ///   - prefs: SCPreferences session
+    /// - Returns: Matching SCNetworkService, or nil if not found
     public static func findService(
         byBSDName bsdName: String,
         in prefs: SCPreferences
@@ -60,9 +60,9 @@ public enum NetworkServiceHelper: Sendable {
         return nil
     }
 
-    /// 获取所有网络服务名称
-    /// - Parameter prefs: SCPreferences 会话
-    /// - Returns: 网络服务名称列表
+    /// Gets all network service names
+    /// - Parameter prefs: SCPreferences session
+    /// - Returns: List of network service names
     public static func allServiceNames(in prefs: SCPreferences) -> [String] {
         guard let services = SCNetworkServiceCopyAll(prefs) as? [SCNetworkService] else {
             return []
@@ -73,18 +73,18 @@ public enum NetworkServiceHelper: Sendable {
         }
     }
 
-    /// 获取服务的代理协议
-    /// - Parameter service: 网络服务
-    /// - Returns: 代理协议，如果未找到则返回 nil
+    /// Gets the proxies protocol for a service
+    /// - Parameter service: Network service
+    /// - Returns: Proxies protocol, or nil if not found
     public static func getProxiesProtocol(
         for service: SCNetworkService
     ) -> SCNetworkProtocol? {
         SCNetworkServiceCopyProtocol(service, kSCNetworkProtocolTypeProxies)
     }
 
-    /// 获取服务的代理配置字典
-    /// - Parameter service: 网络服务
-    /// - Returns: 代理配置字典，如果未找到则返回 nil
+    /// Gets proxy configuration dictionary for a service
+    /// - Parameter service: Network service
+    /// - Returns: Proxy configuration dictionary, or nil if not found
     public static func getProxyConfiguration(
         for service: SCNetworkService
     ) -> [String: Any]? {
@@ -99,24 +99,24 @@ public enum NetworkServiceHelper: Sendable {
 // MARK: - Service Info
 
 public extension NetworkServiceHelper {
-    /// 网络服务信息
+    /// Network service information
     struct ServiceInfo: Sendable {
-        /// 服务名称
+        /// Service name
         public let name: String
 
-        /// BSD 设备名称
+        /// BSD device name
         public let bsdName: String?
 
-        /// 接口类型（如 IEEE80211, Ethernet）
+        /// Interface type (e.g., IEEE80211, Ethernet)
         public let interfaceType: String?
 
-        /// 是否启用
+        /// Whether the service is enabled
         public let isEnabled: Bool
     }
 
-    /// 获取所有网络服务的详细信息
-    /// - Parameter prefs: SCPreferences 会话
-    /// - Returns: 网络服务信息列表
+    /// Gets detailed information for all network services
+    /// - Parameter prefs: SCPreferences session
+    /// - Returns: List of network service information
     static func allServices(in prefs: SCPreferences) -> [ServiceInfo] {
         guard let services = SCNetworkServiceCopyAll(prefs) as? [SCNetworkService] else {
             return []

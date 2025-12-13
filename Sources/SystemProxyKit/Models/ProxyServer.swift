@@ -7,30 +7,30 @@
 
 import Foundation
 
-/// 描述单个代理服务器节点，支持可选的认证信息
+/// Represents a single proxy server node with optional authentication
 public struct ProxyServer: Equatable, Hashable, Sendable, Codable {
-    /// 主机名或 IP 地址
+    /// Hostname or IP address
     public let host: String
 
-    /// 端口号
+    /// Port number
     public let port: Int
 
-    /// 开关状态
+    /// Enable/disable state
     public var isEnabled: Bool
 
-    /// 认证用户名（可选）
+    /// Authentication username (optional)
     public let username: String?
 
-    /// 认证密码（可选，建议使用 Keychain 安全存储）
+    /// Authentication password (optional, should be stored securely in Keychain)
     public let password: String?
 
-    /// 初始化代理服务器配置
+    /// Initializes a proxy server configuration
     /// - Parameters:
-    ///   - host: 主机名或 IP 地址
-    ///   - port: 端口号
-    ///   - isEnabled: 开关状态，默认为 true
-    ///   - username: 认证用户名（可选）
-    ///   - password: 认证密码（可选）
+    ///   - host: Hostname or IP address
+    ///   - port: Port number
+    ///   - isEnabled: Enable/disable state, defaults to true
+    ///   - username: Authentication username (optional)
+    ///   - password: Authentication password (optional)
     public init(
         host: String,
         port: Int,
@@ -45,7 +45,7 @@ public struct ProxyServer: Equatable, Hashable, Sendable, Codable {
         self.password = password
     }
 
-    /// 是否配置了认证信息
+    /// Whether authentication credentials are configured
     public var hasAuthentication: Bool {
         username != nil && password != nil
     }

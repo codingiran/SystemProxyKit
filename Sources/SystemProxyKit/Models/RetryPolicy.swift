@@ -7,31 +7,31 @@
 
 import Foundation
 
-/// 描述操作失败时的重试策略
+/// Retry strategy for failed operations
 public struct RetryPolicy: Equatable, Sendable {
-    /// 最大重试次数
+    /// Maximum number of retry attempts
     public let maxRetries: Int
 
-    /// 重试间隔（秒）
+    /// Retry interval in seconds
     public let delay: TimeInterval
 
-    /// 退避倍数（指数退避）
+    /// Backoff multiplier (for exponential backoff)
     public let backoffMultiplier: Double
 
-    /// 初始化重试策略
+    /// Initializes retry policy
     /// - Parameters:
-    ///   - maxRetries: 最大重试次数
-    ///   - delay: 重试间隔（秒）
-    ///   - backoffMultiplier: 退避倍数
+    ///   - maxRetries: Maximum number of retry attempts
+    ///   - delay: Retry interval in seconds
+    ///   - backoffMultiplier: Backoff multiplier
     public init(maxRetries: Int, delay: TimeInterval, backoffMultiplier: Double) {
         self.maxRetries = maxRetries
         self.delay = delay
         self.backoffMultiplier = backoffMultiplier
     }
 
-    /// 计算第 n 次重试的延迟时间
-    /// - Parameter attempt: 重试次数（从 0 开始）
-    /// - Returns: 延迟时间（秒）
+    /// Calculates delay for the nth retry attempt
+    /// - Parameter attempt: Retry attempt number (starting from 0)
+    /// - Returns: Delay time in seconds
     public func delayForAttempt(_ attempt: Int) -> TimeInterval {
         guard attempt > 0 else { return 0 }
         return delay * pow(backoffMultiplier, Double(attempt - 1))
@@ -41,13 +41,13 @@ public struct RetryPolicy: Equatable, Sendable {
 // MARK: - Preset Policies
 
 public extension RetryPolicy {
-    /// 不重试
+    /// No retry
     static let none = RetryPolicy(maxRetries: 0, delay: 0, backoffMultiplier: 1.0)
 
-    /// 默认策略：3 次重试，0.5 秒起始延迟，2 倍指数退避
+    /// Default policy: 3 retries, 0.5s initial delay, 2x exponential backoff
     static let `default` = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
 
-    /// 激进策略：5 次重试，0.2 秒起始延迟，1.5 倍指数退避
+    /// Aggressive policy: 5 retries, 0.2s initial delay, 1.5x exponential backoff
     static let aggressive = RetryPolicy(maxRetries: 5, delay: 0.2, backoffMultiplier: 1.5)
 }
 

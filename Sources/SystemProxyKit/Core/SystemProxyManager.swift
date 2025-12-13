@@ -9,24 +9,24 @@ import Foundation
 import Security
 import SystemConfiguration
 
-/// 系统代理管理器
-/// 负责事务管理、权限上下文持有、API 暴露
-/// 使用 actor 确保线程安全
+/// System proxy manager
+/// Responsible for transaction management, authorization context holding, and API exposure
+/// Uses actor to ensure thread safety
 public actor SystemProxyManager {
     // MARK: - Properties
 
-    /// 应用程序标识符，用于创建 SCPreferences
+    /// Application identifier used for creating SCPreferences
     private let appIdentifier: String
 
-    /// 授权引用（可选）
+    /// Authorization reference (optional)
     private var authRef: AuthorizationRef?
 
     // MARK: - Initialization
 
-    /// 初始化系统代理管理器
+    /// Initializes system proxy manager
     /// - Parameters:
-    ///   - appIdentifier: 应用程序标识符，用于 SCPreferences
-    ///   - authRef: 授权引用（可选，用于特权操作）
+    ///   - appIdentifier: Application identifier for SCPreferences
+    ///   - authRef: Authorization reference (optional, for privileged operations)
     public init(
         appIdentifier: String = Bundle.main.bundleIdentifier ?? "SystemProxyKit",
         authRef: AuthorizationRef? = nil
@@ -37,36 +37,36 @@ public actor SystemProxyManager {
 
     // MARK: - Public API
 
-    /// 获取指定网络接口的当前代理配置
-    /// - Parameter interface: 网络接口名称，例如 "Wi-Fi"
-    /// - Returns: 当前的代理配置
+    /// Gets current proxy configuration for specified network interface
+    /// - Parameter interface: Network interface name, e.g., "Wi-Fi"
+    /// - Returns: Current proxy configuration
     /// - Throws: SystemProxyError
     public func getConfiguration(for interface: String) async throws -> ProxyConfiguration {
-        // 创建只读 SCPreferences 会话
+        // Create read-only SCPreferences session
         guard let prefs = SCPreferencesCreate(nil, appIdentifier as CFString, nil) else {
             throw SystemProxyError.preferencesCreationFailed
         }
 
-        // 查找网络服务
+        // Find network service
         guard let service = NetworkServiceHelper.findService(byName: interface, in: prefs) else {
             throw SystemProxyError.serviceNotFound(name: interface)
         }
 
-        // 获取代理配置字典
+        // Get proxy configuration dictionary
         guard let configDict = NetworkServiceHelper.getProxyConfiguration(for: service) else {
             throw SystemProxyError.configurationNotFound(serviceName: interface)
         }
 
-        // 转换为 ProxyConfiguration 模型
+        // Convert to ProxyConfiguration model
         return ProxyConfiguration(fromSCDictionary: configDict)
     }
 
-    /// 设置指定网络接口的代理配置
+    /// Sets proxy configuration for specified network interface
     /// - Parameters:
-    ///   - interface: 网络接口名称
-    ///   - configuration: 新的代理配置
-    ///   - authRef: 授权引用（可选，覆盖实例级别的授权）
-    ///   - retryPolicy: 重试策略
+    ///   - interface: Network interface name
+    ///   - configuration: New proxy configuration
+    ///   - authRef: Authorization reference (optional, overrides instance-level auth)
+    ///   - retryPolicy: Retry policy
     /// - Throws: SystemProxyError
     public func setProxy(
         for interface: String,
@@ -85,8 +85,8 @@ public actor SystemProxyManager {
         }
     }
 
-    /// 获取所有可用的网络服务名称
-    /// - Returns: 网络服务名称列表
+    /// Gets all available network service names
+    /// - Returns: List of network service names
     public func availableServices() async throws -> [String] {
         guard let prefs = SCPreferencesCreate(nil, appIdentifier as CFString, nil) else {
             throw SystemProxyError.preferencesCreationFailed
@@ -95,8 +95,8 @@ public actor SystemProxyManager {
         return NetworkServiceHelper.allServiceNames(in: prefs)
     }
 
-    /// 获取所有网络服务的详细信息
-    /// - Returns: 网络服务信息列表
+    /// Gets detailed information for all network services
+    /// - Returns: List of network service information
     public func allServicesInfo() async throws -> [NetworkServiceHelper.ServiceInfo] {
         guard let prefs = SCPreferencesCreate(nil, appIdentifier as CFString, nil) else {
             throw SystemProxyError.preferencesCreationFailed
@@ -105,21 +105,21 @@ public actor SystemProxyManager {
         return NetworkServiceHelper.allServices(in: prefs)
     }
 
-    /// 设置授权引用
-    /// - Parameter authRef: 新的授权引用
+    /// Sets authorization reference
+    /// - Parameter authRef: New authorization reference
     public func setAuthorizationRef(_ authRef: AuthorizationRef?) {
         self.authRef = authRef
     }
 
     // MARK: - Private Implementation
 
-    /// 执行设置代理的核心逻辑
+    /// Executes core logic for setting proxy
     private func performSetProxy(
         for interface: String,
         configuration: ProxyConfiguration,
         authRef: AuthorizationRef?
     ) async throws {
-        // 创建带授权的 SCPreferences 会话
+        // Create authorized SCPreferences session
         let prefs: SCPreferences
         if let authRef = authRef {
             guard let p = SCPreferencesCreateWithAuthorization(
@@ -138,47 +138,47 @@ public actor SystemProxyManager {
             prefs = p
         }
 
-        // 锁定 SCPreferences
+        // Lock SCPreferences
         guard SCPreferencesLock(prefs, true) else {
             throw SystemProxyError.lockFailed
         }
 
-        // 确保解锁
+        // Ensure unlock
         defer {
             SCPreferencesUnlock(prefs)
         }
 
-        // 查找网络服务
+        // Find network service
         guard let service = NetworkServiceHelper.findService(byName: interface, in: prefs) else {
             throw SystemProxyError.serviceNotFound(name: interface)
         }
 
-        // 获取代理协议
+        // Get proxies protocol
         guard let proxiesProtocol = NetworkServiceHelper.getProxiesProtocol(for: service) else {
             throw SystemProxyError.protocolNotFound(serviceName: interface)
         }
 
-        // 获取现有配置并合并新配置
+        // Get existing configuration and merge with new configuration
         let existingConfig = SCNetworkProtocolGetConfiguration(proxiesProtocol) as? [String: Any] ?? [:]
         let newConfigDict = configuration.mergeIntoSCDictionary(existingConfig)
 
-        // 设置新配置
+        // Set new configuration
         guard SCNetworkProtocolSetConfiguration(proxiesProtocol, newConfigDict as CFDictionary) else {
             throw SystemProxyError.commitFailed
         }
 
-        // 提交更改
+        // Commit changes
         guard SCPreferencesCommitChanges(prefs) else {
             throw SystemProxyError.commitFailed
         }
 
-        // 应用更改
+        // Apply changes
         guard SCPreferencesApplyChanges(prefs) else {
             throw SystemProxyError.applyFailed
         }
     }
 
-    /// 带重试的执行
+    /// Executes with retry
     private func withRetry<T>(
         policy: RetryPolicy,
         operation: @escaping () async throws -> T
@@ -191,12 +191,12 @@ public actor SystemProxyManager {
             } catch let error as SystemProxyError {
                 lastError = error
 
-                // 只对 lockFailed 错误进行重试
+                // Only retry on lockFailed error
                 guard case .lockFailed = error, attempt < policy.maxRetries else {
                     throw error
                 }
 
-                // 计算延迟时间
+                // Calculate delay time
                 let delay = policy.delayForAttempt(attempt + 1)
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
@@ -209,19 +209,19 @@ public actor SystemProxyManager {
 // MARK: - Convenience Extensions
 
 public extension SystemProxyManager {
-    /// 快速禁用所有代理
-    /// - Parameter interface: 网络接口名称
+    /// Quickly disable all proxies
+    /// - Parameter interface: Network interface name
     func disableAllProxies(for interface: String) async throws {
         var config = try await getConfiguration(for: interface)
         config.disableAllProxies()
         try await setProxy(for: interface, configuration: config)
     }
 
-    /// 快速设置 HTTP/HTTPS 代理
+    /// Quickly set HTTP/HTTPS proxy
     /// - Parameters:
-    ///   - host: 代理主机
-    ///   - port: 代理端口
-    ///   - interface: 网络接口名称
+    ///   - host: Proxy host
+    ///   - port: Proxy port
+    ///   - interface: Network interface name
     func setHTTPProxy(
         host: String,
         port: Int,
@@ -234,11 +234,11 @@ public extension SystemProxyManager {
         try await setProxy(for: interface, configuration: config)
     }
 
-    /// 快速设置 SOCKS 代理
+    /// Quickly set SOCKS proxy
     /// - Parameters:
-    ///   - host: 代理主机
-    ///   - port: 代理端口
-    ///   - interface: 网络接口名称
+    ///   - host: Proxy host
+    ///   - port: Proxy port
+    ///   - interface: Network interface name
     func setSOCKSProxy(
         host: String,
         port: Int,
@@ -249,10 +249,10 @@ public extension SystemProxyManager {
         try await setProxy(for: interface, configuration: config)
     }
 
-    /// 快速设置 PAC 自动代理
+    /// Quickly set PAC automatic proxy
     /// - Parameters:
-    ///   - url: PAC 脚本 URL
-    ///   - interface: 网络接口名称
+    ///   - url: PAC script URL
+    ///   - interface: Network interface name
     func setPACProxy(
         url: URL,
         for interface: String

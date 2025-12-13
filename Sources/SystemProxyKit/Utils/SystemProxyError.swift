@@ -7,39 +7,39 @@
 
 import Foundation
 
-/// SystemProxyKit 错误枚举
+/// SystemProxyKit error enumeration
 public enum SystemProxyError: Error, Sendable {
-    /// 创建 SCPreferences 失败（系统资源不足或权限严重拒绝）
+    /// Failed to create SCPreferences (insufficient system resources or severe permission denial)
     case preferencesCreationFailed
 
-    /// 锁定 SCPreferences 失败（其他进程正在修改网络设置）
+    /// Failed to lock SCPreferences (another process is modifying network settings)
     case lockFailed
 
-    /// 找不到指定的网络服务
+    /// Specified network service not found
     case serviceNotFound(name: String)
 
-    /// 找不到指定服务的代理协议
+    /// Proxy protocol not found for the specified service
     case protocolNotFound(serviceName: String)
 
-    /// 获取代理配置失败
+    /// Failed to retrieve proxy configuration
     case configurationNotFound(serviceName: String)
 
-    /// 写入系统数据库失败
+    /// Failed to write to system database
     case commitFailed
 
-    /// 配置写入成功但无法生效
+    /// Configuration written successfully but failed to apply
     case applyFailed
 
-    /// 解锁 SCPreferences 失败
+    /// Failed to unlock SCPreferences
     case unlockFailed
 
-    /// 重试次数耗尽
+    /// Retry attempts exhausted
     case retryExhausted(lastErrorMessage: String)
 
-    /// 无效的配置参数
+    /// Invalid configuration parameters
     case invalidConfiguration(message: String)
 
-    /// 未知错误
+    /// Unknown error
     case unknown(message: String)
 }
 

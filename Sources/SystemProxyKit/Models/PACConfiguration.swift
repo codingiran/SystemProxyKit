@@ -7,28 +7,28 @@
 
 import Foundation
 
-/// 描述 PAC (Proxy Auto-Configuration) 自动代理配置
+/// Represents PAC (Proxy Auto-Configuration) settings
 public struct PACConfiguration: Equatable, Hashable, Sendable, Codable {
-    /// PAC 脚本的 URL 地址
+    /// URL of the PAC script
     public let url: URL
 
-    /// 开关状态
+    /// Enable/disable state
     public var isEnabled: Bool
 
-    /// 初始化 PAC 配置
+    /// Initializes PAC configuration
     /// - Parameters:
-    ///   - url: PAC 脚本的 URL 地址
-    ///   - isEnabled: 开关状态，默认为 true
+    ///   - url: URL of the PAC script
+    ///   - isEnabled: Enable/disable state, defaults to true
     public init(url: URL, isEnabled: Bool = true) {
         self.url = url
         self.isEnabled = isEnabled
     }
 
-    /// 从 URL 字符串初始化
+    /// Initializes from URL string
     /// - Parameters:
-    ///   - urlString: PAC 脚本的 URL 字符串
-    ///   - isEnabled: 开关状态，默认为 true
-    /// - Returns: 如果 URL 无效则返回 nil
+    ///   - urlString: URL string of the PAC script
+    ///   - isEnabled: Enable/disable state, defaults to true
+    /// - Returns: `nil` if URL is invalid
     public init?(urlString: String, isEnabled: Bool = true) {
         guard let url = URL(string: urlString) else {
             return nil

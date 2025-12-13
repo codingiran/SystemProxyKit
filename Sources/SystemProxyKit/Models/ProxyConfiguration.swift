@@ -7,46 +7,46 @@
 
 import Foundation
 
-/// 描述完整的网络服务代理配置
+/// Complete network service proxy configuration
 public struct ProxyConfiguration: Equatable, Sendable, Codable {
     // MARK: - Automatic Proxy
 
-    /// 自动发现代理 (WPAD)
+    /// Auto-discover proxy (WPAD)
     public var autoDiscoveryEnabled: Bool
 
-    /// 自动代理配置 (PAC)
+    /// Automatic proxy configuration (PAC)
     public var autoConfigURL: PACConfiguration?
 
     // MARK: - Manual Proxy
 
-    /// 网页代理 (HTTP)
+    /// Web proxy (HTTP)
     public var httpProxy: ProxyServer?
 
-    /// 安全网页代理 (HTTPS)
+    /// Secure web proxy (HTTPS)
     public var httpsProxy: ProxyServer?
 
-    /// SOCKS 代理
+    /// SOCKS proxy
     public var socksProxy: ProxyServer?
 
     // MARK: - Exceptions
 
-    /// 不包括简单主机名
+    /// Exclude simple hostnames
     public var excludeSimpleHostnames: Bool
 
-    /// 忽略的主机与域列表
+    /// Bypass proxy for these hosts and domains
     public var exceptionList: [String]
 
     // MARK: - Initialization
 
-    /// 初始化完整代理配置
+    /// Initializes complete proxy configuration
     /// - Parameters:
-    ///   - autoDiscoveryEnabled: 自动发现代理开关
-    ///   - autoConfigURL: PAC 配置
-    ///   - httpProxy: HTTP 代理配置
-    ///   - httpsProxy: HTTPS 代理配置
-    ///   - socksProxy: SOCKS 代理配置
-    ///   - excludeSimpleHostnames: 是否排除简单主机名
-    ///   - exceptionList: 例外主机列表
+    ///   - autoDiscoveryEnabled: Auto-discover proxy toggle
+    ///   - autoConfigURL: PAC configuration
+    ///   - httpProxy: HTTP proxy configuration
+    ///   - httpsProxy: HTTPS proxy configuration
+    ///   - socksProxy: SOCKS proxy configuration
+    ///   - excludeSimpleHostnames: Whether to exclude simple hostnames
+    ///   - exceptionList: Exception host list
     public init(
         autoDiscoveryEnabled: Bool = false,
         autoConfigURL: PACConfiguration? = nil,
@@ -65,7 +65,7 @@ public struct ProxyConfiguration: Equatable, Sendable, Codable {
         self.exceptionList = exceptionList
     }
 
-    /// 创建一个空的代理配置（所有代理都禁用）
+    /// Creates an empty proxy configuration (all proxies disabled)
     public static var empty: ProxyConfiguration {
         ProxyConfiguration()
     }
@@ -74,24 +74,24 @@ public struct ProxyConfiguration: Equatable, Sendable, Codable {
 // MARK: - Convenience Methods
 
 public extension ProxyConfiguration {
-    /// 是否有任何手动代理启用
+    /// Whether any manual proxy is enabled
     var hasManualProxyEnabled: Bool {
         (httpProxy?.isEnabled ?? false) ||
             (httpsProxy?.isEnabled ?? false) ||
             (socksProxy?.isEnabled ?? false)
     }
 
-    /// 是否有任何自动代理启用
+    /// Whether any automatic proxy is enabled
     var hasAutoProxyEnabled: Bool {
         autoDiscoveryEnabled || (autoConfigURL?.isEnabled ?? false)
     }
 
-    /// 是否有任何代理配置启用
+    /// Whether any proxy configuration is enabled
     var hasAnyProxyEnabled: Bool {
         hasManualProxyEnabled || hasAutoProxyEnabled
     }
 
-    /// 禁用所有代理
+    /// Disables all proxies
     mutating func disableAllProxies() {
         autoDiscoveryEnabled = false
         autoConfigURL?.isEnabled = false
