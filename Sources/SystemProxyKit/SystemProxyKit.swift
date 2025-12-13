@@ -6,7 +6,14 @@
 //
 
 import Foundation
-import Security
+
+// Enforce minimum Swift version for all platforms and build systems.
+#if swift(<5.10)
+    #error("SystemProxyKit doesn't support Swift versions below 5.10.")
+#endif
+
+/// Current SystemProxyKit version Release 0.0.1. Necessary since SPM doesn't use dynamic libraries. Plus this will be more accurate.
+public let version = "0.0.1"
 
 /// Unified entry point for SystemProxyKit library
 /// Provides convenient static methods for accessing common functionality
