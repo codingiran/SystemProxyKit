@@ -207,12 +207,12 @@ struct SCDictionaryMappingTests {
         let dict = original.toSCDictionary()
         let restored = ProxyConfiguration(fromSCDictionary: dict)
 
-        // 基本属性验证
+        // Basic property validation
         #expect(original.autoDiscoveryEnabled == restored.autoDiscoveryEnabled)
         #expect(original.excludeSimpleHostnames == restored.excludeSimpleHostnames)
         #expect(original.exceptionList == restored.exceptionList)
 
-        // 代理服务器验证
+        // Proxy server validation
         #expect(original.httpProxy?.host == restored.httpProxy?.host)
         #expect(original.httpProxy?.port == restored.httpProxy?.port)
         #expect(original.httpProxy?.isEnabled == restored.httpProxy?.isEnabled)

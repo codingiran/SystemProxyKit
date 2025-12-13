@@ -18,10 +18,10 @@ struct NetworkServiceDiscoveryTests {
     func listAvailableServices() async throws {
         let services = try await SystemProxyKit.availableServices()
 
-        // 任何 macOS 系统应该至少有一个网络服务
+        // Any macOS system should have at least one network service
         #expect(!services.isEmpty, "Expected at least one network service")
 
-        // 打印发现的服务（调试用）
+        // Print discovered services (for debugging)
         print("Found \(services.count) network services: \(services)")
     }
 
@@ -32,7 +32,7 @@ struct NetworkServiceDiscoveryTests {
         #expect(!servicesInfo.isEmpty, "Expected at least one network service")
 
         for info in servicesInfo {
-            // 每个服务应该有名称
+            // Each service should have a name
             #expect(!info.name.isEmpty, "Service name should not be empty")
             print("Service: \(info.name), BSD: \(info.bsdName ?? "N/A"), Type: \(info.interfaceType ?? "N/A"), Enabled: \(info.isEnabled)")
         }
@@ -42,11 +42,11 @@ struct NetworkServiceDiscoveryTests {
     func commonServicesExist() async throws {
         let services = try await SystemProxyKit.availableServices()
 
-        // 检查是否存在常见的网络服务（至少一个）
+        // Check if common network services exist (at least one)
         let commonServices = ["Wi-Fi", "Ethernet", "USB 10/100/1000 LAN", "Thunderbolt Bridge"]
         let hasCommonService = services.contains { commonServices.contains($0) }
 
-        // 不强制要求，只是打印信息
+        // Not mandatory, just print info
         if hasCommonService {
             print("Found common network service")
         } else {
@@ -59,7 +59,7 @@ struct NetworkServiceDiscoveryTests {
 
 @Suite("Proxy Configuration Reading")
 struct ProxyConfigurationReadTests {
-    /// 尝试获取第一个可用网络服务的名称
+    /// Attempts to get the first available network service name
     private func getFirstAvailableService() async throws -> String {
         let services = try await SystemProxyKit.availableServices()
         guard let first = services.first else {
@@ -73,7 +73,7 @@ struct ProxyConfigurationReadTests {
         let serviceName = try await getFirstAvailableService()
         let config = try await SystemProxyKit.current(for: serviceName)
 
-        // 配置应该是有效的（不管具体内容）
+        // Configuration should be valid (regardless of specific content)
         print("Configuration for '\(serviceName)': \(config)")
     }
 
@@ -118,7 +118,7 @@ struct ProxyConfigurationReadTests {
     func multipleReads() async throws {
         let serviceName = try await getFirstAvailableService()
 
-        // 连续读取多次
+        // Read multiple times consecutively
         for i in 1 ... 5 {
             let config = try await SystemProxyKit.current(for: serviceName)
             print("Read #\(i): hasAnyProxyEnabled = \(config.hasAnyProxyEnabled)")
@@ -129,7 +129,7 @@ struct ProxyConfigurationReadTests {
     func concurrentReads() async throws {
         let serviceName = try await getFirstAvailableService()
 
-        // 并发读取
+        // Concurrent reads
         await withTaskGroup(of: ProxyConfiguration?.self) { group in
             for _ in 1 ... 10 {
                 group.addTask {

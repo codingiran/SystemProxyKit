@@ -24,8 +24,8 @@ import Testing
 
 @Suite("Privileged Proxy Write Tests", .tags(.privileged), .serialized)
 struct PrivilegedProxyWriteTests {
-    /// 检查是否具有 root 权限
-    /// 如果没有权限，跳过测试
+    /// Checks if the process has root privileges
+    /// If not, skips the test
     private func skipIfNotRoot() -> Bool {
         if getuid() != 0 {
             print("⏭️ Skipping: Test requires root privileges. Run with: sudo swift test --filter Privileged")
@@ -34,10 +34,10 @@ struct PrivilegedProxyWriteTests {
         return false
     }
 
-    /// 获取第一个可用的网络服务名称
+    /// Gets the first available network service name
     private func getTestServiceName() async throws -> String {
         let services = try await SystemProxyKit.availableServices()
-        // 优先使用 Wi-Fi，否则使用第一个可用的服务
+        // Prefer Wi-Fi, otherwise use the first available service
         if services.contains("Wi-Fi") {
             return "Wi-Fi"
         }
@@ -52,23 +52,11 @@ struct PrivilegedProxyWriteTests {
         if skipIfNotRoot() { return }
         let serviceName = try await getTestServiceName()
 
-        // 1. 备份当前配置
+        // 1. Backup current configuration
         let originalConfig = try await SystemProxyKit.current(for: serviceName)
         print("Original config: \(originalConfig)")
 
-        defer {
-            // 4. 恢复原始配置（无论测试成功与否）
-            Task {
-                do {
-                    try await SystemProxyKit.setProxy(originalConfig, for: serviceName)
-                    print("✅ Restored original configuration")
-                } catch {
-                    print("❌ Failed to restore configuration: \(error)")
-                }
-            }
-        }
-
-        // 2. 设置测试代理
+        // 2. Set test proxy
         var testConfig = originalConfig
         testConfig.httpProxy = ProxyServer(
             host: "127.0.0.1",
@@ -84,7 +72,7 @@ struct PrivilegedProxyWriteTests {
         try await SystemProxyKit.setProxy(testConfig, for: serviceName)
         print("Set test proxy configuration")
 
-        // 3. 验证更改生效
+        // 3. Verify changes took effect
         let verifyConfig = try await SystemProxyKit.current(for: serviceName)
 
         #expect(verifyConfig.httpProxy?.host == "127.0.0.1")
@@ -94,6 +82,10 @@ struct PrivilegedProxyWriteTests {
         #expect(verifyConfig.httpsProxy?.port == 18080)
 
         print("✅ Verified proxy was set correctly")
+
+        // 4. Restore original configuration (MUST be synchronous!)
+        try await SystemProxyKit.setProxy(originalConfig, for: serviceName)
+        print("✅ Restored original configuration")
     }
 
     @Test("Set and restore SOCKS proxy")
@@ -101,16 +93,10 @@ struct PrivilegedProxyWriteTests {
         if skipIfNotRoot() { return }
         let serviceName = try await getTestServiceName()
 
-        // 备份
+        // Backup
         let originalConfig = try await SystemProxyKit.current(for: serviceName)
 
-        defer {
-            Task {
-                try? await SystemProxyKit.setProxy(originalConfig, for: serviceName)
-            }
-        }
-
-        // 设置 SOCKS 代理
+        // Set SOCKS proxy
         var testConfig = originalConfig
         testConfig.socksProxy = ProxyServer(
             host: "127.0.0.1",
@@ -120,12 +106,16 @@ struct PrivilegedProxyWriteTests {
 
         try await SystemProxyKit.setProxy(testConfig, for: serviceName)
 
-        // 验证
+        // Verify
         let verifyConfig = try await SystemProxyKit.current(for: serviceName)
 
         #expect(verifyConfig.socksProxy?.host == "127.0.0.1")
         #expect(verifyConfig.socksProxy?.port == 11080)
         #expect(verifyConfig.socksProxy?.isEnabled == true)
+
+        // Restore
+        try await SystemProxyKit.setProxy(originalConfig, for: serviceName)
+        print("✅ Restored original configuration")
     }
 
     @Test("Set and restore PAC configuration")
@@ -133,29 +123,27 @@ struct PrivilegedProxyWriteTests {
         if skipIfNotRoot() { return }
         let serviceName = try await getTestServiceName()
 
-        // 备份
+        // Backup
         let originalConfig = try await SystemProxyKit.current(for: serviceName)
 
-        defer {
-            Task {
-                try? await SystemProxyKit.setProxy(originalConfig, for: serviceName)
-            }
-        }
-
-        // 设置 PAC
+        // Set PAC
         var testConfig = originalConfig
         testConfig.autoConfigURL = PACConfiguration(
-            url: URL(string: "http://127.0.0.1:8080/proxy.pac")!,
+            url: URL(string: "http://example.com/proxy.pac")!,
             isEnabled: true
         )
 
         try await SystemProxyKit.setProxy(testConfig, for: serviceName)
 
-        // 验证
+        // Verify
         let verifyConfig = try await SystemProxyKit.current(for: serviceName)
 
+        #expect(verifyConfig.autoConfigURL?.url.absoluteString == "http://example.com/proxy.pac")
         #expect(verifyConfig.autoConfigURL?.isEnabled == true)
-        #expect(verifyConfig.autoConfigURL?.url.absoluteString == "http://127.0.0.1:8080/proxy.pac")
+
+        // Restore
+        try await SystemProxyKit.setProxy(originalConfig, for: serviceName)
+        print("✅ Restored original configuration")
     }
 
     @Test("Disable all proxies")
@@ -163,31 +151,29 @@ struct PrivilegedProxyWriteTests {
         if skipIfNotRoot() { return }
         let serviceName = try await getTestServiceName()
 
-        // 备份
+        // Backup
         let originalConfig = try await SystemProxyKit.current(for: serviceName)
 
-        defer {
-            Task {
-                try? await SystemProxyKit.setProxy(originalConfig, for: serviceName)
-            }
-        }
-
-        // 先设置一些代理
+        // First set some proxies
         var testConfig = originalConfig
         testConfig.httpProxy = ProxyServer(host: "127.0.0.1", port: 8080, isEnabled: true)
         testConfig.autoDiscoveryEnabled = true
 
         try await SystemProxyKit.setProxy(testConfig, for: serviceName)
 
-        // 然后禁用所有代理
+        // Then disable all proxies
         try await SystemProxyKit.disableAllProxies(for: serviceName)
 
-        // 验证
+        // Verify
         let verifyConfig = try await SystemProxyKit.current(for: serviceName)
 
         #expect(!verifyConfig.hasAnyProxyEnabled)
         #expect(!verifyConfig.autoDiscoveryEnabled)
         #expect(verifyConfig.httpProxy?.isEnabled != true)
+
+        // Restore
+        try await SystemProxyKit.setProxy(originalConfig, for: serviceName)
+        print("✅ Restored original configuration")
     }
 
     @Test("Set exception list")
@@ -195,28 +181,26 @@ struct PrivilegedProxyWriteTests {
         if skipIfNotRoot() { return }
         let serviceName = try await getTestServiceName()
 
-        // 备份
+        // Backup
         let originalConfig = try await SystemProxyKit.current(for: serviceName)
 
-        defer {
-            Task {
-                try? await SystemProxyKit.setProxy(originalConfig, for: serviceName)
-            }
-        }
-
-        // 设置例外列表
+        // Set exception list
         var testConfig = originalConfig
-        testConfig.exceptionList = ["localhost", "127.0.0.1", "*.local", "192.168.*"]
         testConfig.excludeSimpleHostnames = true
+        testConfig.exceptionList = ["*.local", "169.254/16"]
 
         try await SystemProxyKit.setProxy(testConfig, for: serviceName)
 
-        // 验证
+        // Verify
         let verifyConfig = try await SystemProxyKit.current(for: serviceName)
 
-        #expect(verifyConfig.excludeSimpleHostnames)
-        #expect(verifyConfig.exceptionList.contains("localhost"))
+        #expect(verifyConfig.excludeSimpleHostnames == true)
         #expect(verifyConfig.exceptionList.contains("*.local"))
+        #expect(verifyConfig.exceptionList.contains("169.254/16"))
+
+        // Restore
+        try await SystemProxyKit.setProxy(originalConfig, for: serviceName)
+        print("✅ Restored original configuration")
     }
 
     @Test("Convenience method setHTTPProxy works")
@@ -224,25 +208,23 @@ struct PrivilegedProxyWriteTests {
         if skipIfNotRoot() { return }
         let serviceName = try await getTestServiceName()
 
-        // 备份
+        // Backup
         let originalConfig = try await SystemProxyKit.current(for: serviceName)
 
-        defer {
-            Task {
-                try? await SystemProxyKit.setProxy(originalConfig, for: serviceName)
-            }
-        }
-
-        // 使用便利方法
+        // Use convenience method
         try await SystemProxyKit.setHTTPProxy(host: "127.0.0.1", port: 19999, for: serviceName)
 
-        // 验证
+        // Verify
         let verifyConfig = try await SystemProxyKit.current(for: serviceName)
 
         #expect(verifyConfig.httpProxy?.host == "127.0.0.1")
         #expect(verifyConfig.httpProxy?.port == 19999)
         #expect(verifyConfig.httpsProxy?.host == "127.0.0.1")
         #expect(verifyConfig.httpsProxy?.port == 19999)
+
+        // Restore
+        try await SystemProxyKit.setProxy(originalConfig, for: serviceName)
+        print("✅ Restored original configuration")
     }
 }
 
