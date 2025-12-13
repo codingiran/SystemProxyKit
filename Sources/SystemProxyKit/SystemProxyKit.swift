@@ -25,12 +25,22 @@ public enum SystemProxyKit {
 
     // MARK: - Quick Access API
 
-    /// Quickly gets current proxy configuration for specified network interface
+    /// Gets current proxy configuration for specified network interface
     /// - Parameter interface: Network interface name, e.g., "Wi-Fi"
     /// - Returns: Current proxy configuration
     /// - Throws: SystemProxyError
-    public static func current(for interface: String) async throws -> ProxyConfiguration {
+    public static func getProxy(for interface: String) async throws -> ProxyConfiguration {
         try await shared.getConfiguration(for: interface)
+    }
+
+    /// Gets current proxy configurations for multiple network interfaces
+    /// - Parameter interfaces: Array of network interface names
+    /// - Returns: Array of (interface, configuration) tuples for succeeded lookups
+    /// - Throws: SystemProxyError for infrastructure failures
+    public static func getProxy(
+        for interfaces: [String]
+    ) async throws -> [(interface: String, config: ProxyConfiguration)] {
+        try await shared.getConfigurations(for: interfaces)
     }
 
     /// Quickly sets proxy configuration for specified network interface
@@ -49,6 +59,58 @@ public enum SystemProxyKit {
             configuration: config,
             retryPolicy: retryPolicy
         )
+    }
+
+    /// Sets proxy configuration for multiple network interfaces with a single commit/apply
+    /// This is more efficient than calling setProxy multiple times.
+    /// - Parameters:
+    ///   - configurations: Array of (interface name, proxy configuration) tuples
+    ///   - retryPolicy: Retry policy, defaults to .default
+    /// - Returns: BatchProxyResult containing succeeded and failed services
+    /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    public static func setProxy(
+        configurations: [(interface: String, config: ProxyConfiguration)],
+        retryPolicy: RetryPolicy = .default
+    ) async throws -> BatchProxyResult {
+        try await shared.setProxy(
+            configurations: configurations,
+            retryPolicy: retryPolicy
+        )
+    }
+
+    /// Sets the same proxy configuration for multiple network interfaces with a single commit/apply
+    /// - Parameters:
+    ///   - config: Proxy configuration to apply to all interfaces
+    ///   - interfaces: Array of network interface names
+    ///   - retryPolicy: Retry policy, defaults to .default
+    /// - Returns: BatchProxyResult containing succeeded and failed services
+    /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    public static func setProxy(
+        _ config: ProxyConfiguration,
+        for interfaces: [String],
+        retryPolicy: RetryPolicy = .default
+    ) async throws -> BatchProxyResult {
+        try await shared.setProxy(
+            config,
+            for: interfaces,
+            retryPolicy: retryPolicy
+        )
+    }
+
+    /// Sets the same proxy configuration for all enabled network services
+    /// - Parameters:
+    ///   - config: Proxy configuration to apply
+    ///   - retryPolicy: Retry policy, defaults to .default
+    /// - Returns: BatchProxyResult containing succeeded and failed services
+    /// - Throws: SystemProxyError
+    public static func setProxyForAllEnabledServices(
+        _ config: ProxyConfiguration,
+        retryPolicy: RetryPolicy = .default
+    ) async throws -> BatchProxyResult {
+        let services = try await allServicesInfo()
+        let enabledServices = services.filter { $0.isEnabled }.map { $0.name }
+        let configurations = enabledServices.map { (interface: $0, config: config) }
+        return try await setProxy(configurations: configurations, retryPolicy: retryPolicy)
     }
 
     /// Gets all available network service names

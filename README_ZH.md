@@ -43,15 +43,21 @@ dependencies: [
 ```swift
 import SystemProxyKit
 
-// 获取当前代理设置
-let config = try await SystemProxyKit.current(for: "Wi-Fi")
+// 获取单个接口的代理设置
+let config = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 print(config)
+
+// 批量获取多个接口的代理配置
+let configs = try await SystemProxyKit.getProxy(for: ["Wi-Fi", "Ethernet"])
+for (interface, config) in configs {
+    print("\(interface): \(config)")
+}
 ```
 
 ### 设置 HTTP 代理
 
 ```swift
-// 快捷方法
+// 单个接口的快捷方法
 try await SystemProxyKit.setHTTPProxy(
     host: "127.0.0.1",
     port: 7890,
@@ -59,10 +65,24 @@ try await SystemProxyKit.setHTTPProxy(
 )
 
 // 或手动配置
-var config = try await SystemProxyKit.current(for: "Wi-Fi")
+var config = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 config.httpProxy = ProxyServer(host: "127.0.0.1", port: 7890, isEnabled: true)
 config.httpsProxy = ProxyServer(host: "127.0.0.1", port: 7890, isEnabled: true)
 try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
+```
+
+### 批量代理配置
+
+```swift
+// 为多个接口设置相同的代理（单次 commit/apply，效率更高）
+var config = ProxyConfiguration()
+config.httpProxy = ProxyServer(host: "127.0.0.1", port: 7890, isEnabled: true)
+
+let result = try await SystemProxyKit.setProxy(config, for: ["Wi-Fi", "Ethernet", "Thunderbolt Bridge"])
+print("成功: \(result.succeeded), 失败: \(result.failed.count)")
+
+// 或为所有启用的服务设置代理
+let result = try await SystemProxyKit.setProxyForAllEnabledServices(config)
 ```
 
 ### PAC 配置
@@ -76,7 +96,7 @@ try await SystemProxyKit.setPACProxy(url: pacURL, for: "Wi-Fi")
 
 ```swift
 // 1. 备份原始设置
-let original = try await SystemProxyKit.current(for: "Wi-Fi")
+let original = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 
 // 2. 应用新配置
 try await SystemProxyKit.setHTTPProxy(host: "127.0.0.1", port: 7890, for: "Wi-Fi")
@@ -94,19 +114,25 @@ try await SystemProxyKit.setProxy(original, for: "Wi-Fi")
 - **`ProxyConfiguration`**：网络接口的完整代理设置
 - **`ProxyServer`**：单个代理服务器，支持可选认证
 - **`PACConfiguration`**：PAC（代理自动配置）设置
-- **`RetryPolicy`**：可配置的重试策略
+- **`BatchProxyResult`**：批量操作结果，包含成功/失败列表
+- **`RetryPolicy`**：可配置的重试策略（默认：不重试）
 
 ### 主要 API
 
 ```swift
-// 获取代理配置
-func current(for interface: String) async throws -> ProxyConfiguration
+// 获取代理配置（单个或批量）
+func getProxy(for interface: String) async throws -> ProxyConfiguration
+func getProxy(for interfaces: [String]) async throws -> [(interface: String, config: ProxyConfiguration)]
 
-// 设置代理配置
+// 设置代理配置（单个或批量）
 func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
+func setProxy(_ config: ProxyConfiguration, for interfaces: [String]) async throws -> BatchProxyResult
+func setProxy(configurations: [(interface: String, config: ProxyConfiguration)]) async throws -> BatchProxyResult
+func setProxyForAllEnabledServices(_ config: ProxyConfiguration) async throws -> BatchProxyResult
 
 // 列出网络服务
 func availableServices() async throws -> [String]
+func allServicesInfo() async throws -> [ServiceInfo]
 
 // 禁用所有代理
 func disableAllProxies(for interface: String) async throws

@@ -34,6 +34,7 @@ SystemProxyKit/
 │       │   ├── ProxyConfiguration.swift
 │       │   ├── ProxyServer.swift
 │       │   ├── PACConfiguration.swift
+│       │   ├── BatchProxyResult.swift
 │       │   └── RetryPolicy.swift
 │       ├── Mapping/               # [Conversion Layer] Swift Model <-> SC Dictionary conversion
 │       │   └── ProxyConfiguration+SC.swift
@@ -125,16 +126,29 @@ Defines retry strategy for failed operations, customizable by callers.
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| `maxRetries` | `Int` | Maximum retry attempts (default: 3) |
-| `delay` | `TimeInterval` | Retry interval in seconds (default: 0.5) |
-| `backoffMultiplier` | `Double` | Backoff multiplier (default: 2.0, exponential backoff) |
+| `maxRetries` | `Int` | Maximum retry attempts (default: 0) |
+| `delay` | `TimeInterval` | Retry interval in seconds (default: 0) |
+| `backoffMultiplier` | `Double` | Backoff multiplier (default: 1.0) |
 
 ```swift
 // Preset policies
 static let none = RetryPolicy(maxRetries: 0, delay: 0, backoffMultiplier: 1.0)
-static let `default` = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
+static let `default` = RetryPolicy.none  // Default: no retry
+static let standard = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
 static let aggressive = RetryPolicy(maxRetries: 5, delay: 0.2, backoffMultiplier: 1.5)
 ```
+
+### 3.5 `BatchProxyResult`
+
+Result of batch proxy configuration operations.
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `succeeded` | `[String]` | Successfully configured services |
+| `failed` | `[(service: String, error: Error)]` | Failed services with errors |
+| `allSucceeded` | `Bool` | Whether all operations succeeded |
+| `successCount` | `Int` | Number of successful operations |
+| `failureCount` | `Int` | Number of failed operations |
 
 -----
 
@@ -212,12 +226,18 @@ func setProxy(
 **3. Convenience Static Methods**
 
 ```swift
-// Quick get current configuration
-static func current(for interface: String) async throws -> ProxyConfiguration
+// Get proxy configuration (single or batch)
+static func getProxy(for interface: String) async throws -> ProxyConfiguration
+static func getProxy(for interfaces: [String]) async throws -> [(interface: String, config: ProxyConfiguration)]
 
-// Quick set proxy
+// Set proxy (single or batch)
 static func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
+static func setProxy(_ config: ProxyConfiguration, for interfaces: [String]) async throws -> BatchProxyResult
+static func setProxy(configurations: [(interface: String, config: ProxyConfiguration)]) async throws -> BatchProxyResult
+static func setProxyForAllEnabledServices(_ config: ProxyConfiguration) async throws -> BatchProxyResult
 ```
+
+> **Batch Operations:** Batch methods optimize performance by using a single `SCPreferencesCommitChanges` and `SCPreferencesApplyChanges` call for multiple services.
 
 -----
 
@@ -243,7 +263,7 @@ Standard **"Safe Modification Pattern"** for clients using this library:
 import SystemProxyKit
 
 // 1. Backup current configuration
-let originalConfig = try await SystemProxyKit.current(for: "Wi-Fi")
+let originalConfig = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 
 // 2. Create new configuration
 let newProxy = ProxyServer(
@@ -271,7 +291,7 @@ try await SystemProxyKit.setProxy(originalConfig, for: "Wi-Fi")
 ### PAC Configuration Example
 
 ```swift
-var config = try await SystemProxyKit.current(for: "Wi-Fi")
+var config = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 config.autoConfigURL = PACConfiguration(
     url: URL(string: "http://example.com/proxy.pac")!,
     isEnabled: true
@@ -283,7 +303,7 @@ try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
 
 ## 8. TODO & Risks
 
-1. **Multi-Interface Concurrency:** Current design targets single interface. For users with both Ethernet and Wi-Fi, a strategy may be needed to determine which to modify (typically the Active one with highest priority).
+1. ~~**Multi-Interface Concurrency:** Current design targets single interface.~~ **RESOLVED:** Batch APIs now support multiple interfaces with optimized single commit/apply.
 2. **Authorization Context:** While the library doesn't implement XPC, the API design reserves an `authRef` entry point to ensure non-breaking API integration with `Security.framework` in the future.
 3. **IPv6 Support:** Verify that `SystemConfiguration` properly handles IPv6 literal addresses (typically handled by system layer, but worth attention).
 4. **Keychain Integration:** Secure storage of proxy authentication passwords requires Keychain integration in future versions; current version uses in-memory storage.
@@ -297,6 +317,7 @@ try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
 | `ProxyServer` | `Equatable`, `Hashable`, `Sendable`, `Codable` |
 | `PACConfiguration` | `Equatable`, `Hashable`, `Sendable`, `Codable` |
 | `ProxyConfiguration` | `Equatable`, `Sendable`, `Codable` |
+| `BatchProxyResult` | `Sendable` |
 | `RetryPolicy` | `Equatable`, `Sendable` |
 | `SystemProxyError` | `Error`, `Sendable` |
 | `SystemProxyManager` | `Sendable` (via `actor`) |

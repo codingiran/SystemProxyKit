@@ -32,7 +32,10 @@ SystemProxyKit/
 │   └── SystemProxyKit/
 │       ├── Models/                # [数据层] 纯 Swift 结构体，无任何 SC 依赖
 │       │   ├── ProxyConfiguration.swift
-│       │   └── ProxyServer.swift
+│       │   ├── ProxyServer.swift
+│       │   ├── PACConfiguration.swift
+│       │   ├── BatchProxyResult.swift
+│       │   └── RetryPolicy.swift
 │       ├── Mapping/               # [转换层] 负责 Swift Model <-> SC Dictionary 互转
 │       │   └── ProxyConfiguration+SC.swift
 │       ├── Core/                  # [逻辑层] 核心业务与系统交互
@@ -121,16 +124,29 @@ graph TD
 
 | 属性 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `maxRetries` | `Int` | 最大重试次数（默认 3） |
-| `delay` | `TimeInterval` | 重试间隔（秒，默认 0.5） |
-| `backoffMultiplier` | `Double` | 退避倍数（默认 2.0，指数退避） |
+| `maxRetries` | `Int` | 最大重试次数（默认 0） |
+| `delay` | `TimeInterval` | 重试间隔（秒，默认 0） |
+| `backoffMultiplier` | `Double` | 退避倍数（默认 1.0） |
 
 ```swift
 // 预设策略
 static let none = RetryPolicy(maxRetries: 0, delay: 0, backoffMultiplier: 1.0)
-static let `default` = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
+static let `default` = RetryPolicy.none  // 默认：不重试
+static let standard = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
 static let aggressive = RetryPolicy(maxRetries: 5, delay: 0.2, backoffMultiplier: 1.5)
 ```
+
+### 3.5 `BatchProxyResult`
+
+批量代理配置操作的结果。
+
+| 属性 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `succeeded` | `[String]` | 成功配置的服务列表 |
+| `failed` | `[(service: String, error: Error)]` | 失败的服务及错误 |
+| `allSucceeded` | `Bool` | 是否全部成功 |
+| `successCount` | `Int` | 成功操作数 |
+| `failureCount` | `Int` | 失败操作数 |
 
 -----
 
@@ -208,12 +224,18 @@ func setProxy(
 **3. 便捷静态方法**
 
 ```swift
-// 快速获取当前配置
-static func current(for interface: String) async throws -> ProxyConfiguration
+// 获取代理配置（单个或批量）
+static func getProxy(for interface: String) async throws -> ProxyConfiguration
+static func getProxy(for interfaces: [String]) async throws -> [(interface: String, config: ProxyConfiguration)]
 
-// 快速设置代理
+// 设置代理（单个或批量）
 static func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
+static func setProxy(_ config: ProxyConfiguration, for interfaces: [String]) async throws -> BatchProxyResult
+static func setProxy(configurations: [(interface: String, config: ProxyConfiguration)]) async throws -> BatchProxyResult
+static func setProxyForAllEnabledServices(_ config: ProxyConfiguration) async throws -> BatchProxyResult
 ```
+
+> **批量操作：** 批量方法通过单次 `SCPreferencesCommitChanges` 和 `SCPreferencesApplyChanges` 调用来优化性能。
 
 -----
 
@@ -239,7 +261,7 @@ static func setProxy(_ config: ProxyConfiguration, for interface: String) async 
 import SystemProxyKit
 
 // 1. 备份当前配置
-let originalConfig = try await SystemProxyKit.current(for: "Wi-Fi")
+let originalConfig = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 
 // 2. 创建新配置
 let newProxy = ProxyServer(
@@ -267,7 +289,7 @@ try await SystemProxyKit.setProxy(originalConfig, for: "Wi-Fi")
 ### PAC 配置示例
 
 ```swift
-var config = try await SystemProxyKit.current(for: "Wi-Fi")
+var config = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 config.autoConfigURL = PACConfiguration(
     url: URL(string: "http://example.com/proxy.pac")!,
     isEnabled: true
@@ -279,7 +301,7 @@ try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
 
 ## 8\. 待办事项与风险 (TODO & Risks)
 
-1.  **多网卡并发：** 目前设计是针对单网卡（Interface String）。如果用户同时插网线和连 Wi-Fi，可能需要策略去决定修改哪个（通常修改 Active 且优先级最高的）。
+1.  ~~**多网卡并发：** 目前设计是针对单网卡。~~ **已解决：** 批量 API 现已支持多网卡，通过单次 commit/apply 优化性能。
 2.  **权限上下文：** 虽然库不负责实现 XPC，但 API 设计中预留了 `authRef` 入口，确保未来接入 `Security.framework` 时无需破坏性重构 API。
 3.  **IPv6 支持：** 确认 `SystemConfiguration` 中对于 IPv6 字面量地址的解析是否存在坑（通常由系统底层处理，但需留意）。
 4.  **Keychain 集成：** 代理认证密码的安全存储需要后续版本集成 Keychain 服务，当前版本暂时使用内存存储。
@@ -293,6 +315,7 @@ try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
 | `ProxyServer` | `Equatable`, `Hashable`, `Sendable`, `Codable` |
 | `PACConfiguration` | `Equatable`, `Hashable`, `Sendable`, `Codable` |
 | `ProxyConfiguration` | `Equatable`, `Sendable`, `Codable` |
+| `BatchProxyResult` | `Sendable` |
 | `RetryPolicy` | `Equatable`, `Sendable` |
 | `SystemProxyError` | `Error`, `Sendable` |
-| `SystemProxyManager` | `Sendable` (通过 `actor` 或内部同步机制) |
+| `SystemProxyManager` | `Sendable` (通过 `actor` 实现) |

@@ -42,23 +42,49 @@ public actor SystemProxyManager {
     /// - Returns: Current proxy configuration
     /// - Throws: SystemProxyError
     public func getConfiguration(for interface: String) async throws -> ProxyConfiguration {
+        let results = try await getConfigurations(for: [interface])
+        guard let config = results.first?.config else {
+            throw SystemProxyError.configurationNotFound(serviceName: interface)
+        }
+        return config
+    }
+
+    /// Gets current proxy configurations for multiple network interfaces
+    /// - Parameter interfaces: Array of network interface names
+    /// - Returns: Array of (interface, configuration) tuples for succeeded lookups
+    /// - Throws: SystemProxyError for infrastructure failures
+    public func getConfigurations(
+        for interfaces: [String]
+    ) async throws -> [(interface: String, config: ProxyConfiguration)] {
+        // Early return for empty interfaces
+        if interfaces.isEmpty {
+            return []
+        }
+
         // Create read-only SCPreferences session
         guard let prefs = SCPreferencesCreate(nil, appIdentifier as CFString, nil) else {
             throw SystemProxyError.preferencesCreationFailed
         }
 
-        // Find network service
-        guard let service = NetworkServiceHelper.findService(byName: interface, in: prefs) else {
-            throw SystemProxyError.serviceNotFound(name: interface)
+        var results: [(interface: String, config: ProxyConfiguration)] = []
+
+        for interface in interfaces {
+            // Find network service
+            guard let service = NetworkServiceHelper.findService(byName: interface, in: prefs) else {
+                continue // Skip if service not found
+            }
+
+            // Get proxy configuration dictionary
+            guard let configDict = NetworkServiceHelper.getProxyConfiguration(for: service) else {
+                continue // Skip if configuration not found
+            }
+
+            // Convert to ProxyConfiguration model
+            let config = ProxyConfiguration(fromSCDictionary: configDict)
+            results.append((interface, config))
         }
 
-        // Get proxy configuration dictionary
-        guard let configDict = NetworkServiceHelper.getProxyConfiguration(for: service) else {
-            throw SystemProxyError.configurationNotFound(serviceName: interface)
-        }
-
-        // Convert to ProxyConfiguration model
-        return ProxyConfiguration(fromSCDictionary: configDict)
+        return results
     }
 
     /// Sets proxy configuration for specified network interface
@@ -83,6 +109,52 @@ public actor SystemProxyManager {
                 authRef: effectiveAuthRef
             )
         }
+    }
+
+    /// Sets proxy configuration for multiple network interfaces with a single commit/apply
+    /// This is more efficient than calling setProxy multiple times as it only performs
+    /// one SCPreferencesCommitChanges and SCPreferencesApplyChanges operation.
+    /// - Parameters:
+    ///   - configurations: Array of (interface name, proxy configuration) tuples
+    ///   - authRef: Authorization reference (optional, overrides instance-level auth)
+    ///   - retryPolicy: Retry policy
+    /// - Returns: BatchProxyResult containing succeeded and failed services
+    /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    public func setProxy(
+        configurations: [(interface: String, config: ProxyConfiguration)],
+        authRef: AuthorizationRef? = nil,
+        retryPolicy: RetryPolicy = .default
+    ) async throws -> BatchProxyResult {
+        let effectiveAuthRef = authRef ?? self.authRef
+
+        return try await withRetry(policy: retryPolicy) {
+            try await self.performBatchSetProxy(
+                configurations: configurations,
+                authRef: effectiveAuthRef
+            )
+        }
+    }
+
+    /// Sets the same proxy configuration for multiple network interfaces with a single commit/apply
+    /// - Parameters:
+    ///   - configuration: Proxy configuration to apply to all interfaces
+    ///   - interfaces: Array of network interface names
+    ///   - authRef: Authorization reference (optional, overrides instance-level auth)
+    ///   - retryPolicy: Retry policy
+    /// - Returns: BatchProxyResult containing succeeded and failed services
+    /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    public func setProxy(
+        _ configuration: ProxyConfiguration,
+        for interfaces: [String],
+        authRef: AuthorizationRef? = nil,
+        retryPolicy: RetryPolicy = .default
+    ) async throws -> BatchProxyResult {
+        let configurations = interfaces.map { (interface: $0, config: configuration) }
+        return try await setProxy(
+            configurations: configurations,
+            authRef: authRef,
+            retryPolicy: retryPolicy
+        )
     }
 
     /// Gets all available network service names
@@ -113,12 +185,37 @@ public actor SystemProxyManager {
 
     // MARK: - Private Implementation
 
-    /// Executes core logic for setting proxy
+    /// Executes core logic for setting proxy on a single service (delegates to batch version)
     private func performSetProxy(
         for interface: String,
         configuration: ProxyConfiguration,
         authRef: AuthorizationRef?
     ) async throws {
+        let result = try await performBatchSetProxy(
+            configurations: [(interface, configuration)],
+            authRef: authRef
+        )
+        // For single service, if it failed, throw the error
+        if let failure = result.failed.first {
+            throw failure.error
+        }
+    }
+
+    /// Executes core logic for setting proxy on multiple services with single commit/apply
+    /// - Parameters:
+    ///   - configurations: Array of (interface name, proxy configuration) tuples
+    ///   - authRef: Authorization reference
+    /// - Returns: BatchProxyResult with succeeded and failed services
+    /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    private func performBatchSetProxy(
+        configurations: [(interface: String, config: ProxyConfiguration)],
+        authRef: AuthorizationRef?
+    ) async throws -> BatchProxyResult {
+        // Early return for empty configurations - nothing to do
+        if configurations.isEmpty {
+            return BatchProxyResult(succeeded: [], failed: [])
+        }
+
         // Create authorized SCPreferences session
         let prefs: SCPreferences
         if let authRef = authRef {
@@ -148,34 +245,53 @@ public actor SystemProxyManager {
             SCPreferencesUnlock(prefs)
         }
 
-        // Find network service
-        guard let service = NetworkServiceHelper.findService(byName: interface, in: prefs) else {
-            throw SystemProxyError.serviceNotFound(name: interface)
+        // Process each service
+        var succeeded: [String] = []
+        var failed: [(service: String, error: Error)] = []
+
+        for (interface, configuration) in configurations {
+            do {
+                // Find network service
+                guard let service = NetworkServiceHelper.findService(byName: interface, in: prefs) else {
+                    throw SystemProxyError.serviceNotFound(name: interface)
+                }
+
+                // Get proxies protocol
+                guard let proxiesProtocol = NetworkServiceHelper.getProxiesProtocol(for: service) else {
+                    throw SystemProxyError.protocolNotFound(serviceName: interface)
+                }
+
+                // Get existing configuration and merge with new configuration
+                let existingConfig = SCNetworkProtocolGetConfiguration(proxiesProtocol) as? [String: Any] ?? [:]
+                let newConfigDict = configuration.mergeIntoSCDictionary(existingConfig)
+
+                // Set new configuration
+                guard SCNetworkProtocolSetConfiguration(proxiesProtocol, newConfigDict as CFDictionary) else {
+                    throw SystemProxyError.invalidConfiguration(message: "Failed to set configuration for \(interface)")
+                }
+
+                succeeded.append(interface)
+            } catch {
+                failed.append((interface, error))
+            }
         }
 
-        // Get proxies protocol
-        guard let proxiesProtocol = NetworkServiceHelper.getProxiesProtocol(for: service) else {
-            throw SystemProxyError.protocolNotFound(serviceName: interface)
+        // If all operations failed, throw error without committing
+        if succeeded.isEmpty {
+            let errorDetails = failed.map { ($0.service, $0.error.localizedDescription) }
+            throw SystemProxyError.batchOperationFailed(errors: errorDetails)
         }
 
-        // Get existing configuration and merge with new configuration
-        let existingConfig = SCNetworkProtocolGetConfiguration(proxiesProtocol) as? [String: Any] ?? [:]
-        let newConfigDict = configuration.mergeIntoSCDictionary(existingConfig)
-
-        // Set new configuration
-        guard SCNetworkProtocolSetConfiguration(proxiesProtocol, newConfigDict as CFDictionary) else {
-            throw SystemProxyError.commitFailed
-        }
-
-        // Commit changes
+        // At least one succeeded, commit and apply changes
         guard SCPreferencesCommitChanges(prefs) else {
             throw SystemProxyError.commitFailed
         }
 
-        // Apply changes
         guard SCPreferencesApplyChanges(prefs) else {
             throw SystemProxyError.applyFailed
         }
+
+        return BatchProxyResult(succeeded: succeeded, failed: failed)
     }
 
     /// Executes with retry

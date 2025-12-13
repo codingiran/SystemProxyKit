@@ -39,6 +39,9 @@ public enum SystemProxyError: Error, Sendable {
     /// Invalid configuration parameters
     case invalidConfiguration(message: String)
 
+    /// All operations in a batch failed
+    case batchOperationFailed(errors: [(service: String, message: String)])
+
     /// Unknown error
     case unknown(message: String)
 }
@@ -68,6 +71,9 @@ extension SystemProxyError: LocalizedError {
             return "Retry attempts exhausted. Last error: \(lastErrorMessage)"
         case let .invalidConfiguration(message):
             return "Invalid configuration: \(message)"
+        case let .batchOperationFailed(errors):
+            let details = errors.map { "\($0.service): \($0.message)" }.joined(separator: "; ")
+            return "All batch operations failed: \(details)"
         case let .unknown(message):
             return "Unknown error: \(message)"
         }
@@ -93,6 +99,8 @@ extension SystemProxyError: LocalizedError {
             return "Consider increasing the retry policy or investigating the underlying issue."
         case .invalidConfiguration:
             return "Review and correct the configuration parameters."
+        case .batchOperationFailed:
+            return "Check individual service errors for details. Some services may not exist or may be disabled."
         case .unknown:
             return nil
         }

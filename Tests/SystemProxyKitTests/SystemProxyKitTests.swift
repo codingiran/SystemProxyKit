@@ -88,7 +88,8 @@ struct RetryPolicyTests {
     @Test("Preset policies have correct values")
     func presets() {
         #expect(RetryPolicy.none.maxRetries == 0)
-        #expect(RetryPolicy.default.maxRetries == 3)
+        #expect(RetryPolicy.default.maxRetries == 0) // Default is now no-retry
+        #expect(RetryPolicy.standard.maxRetries == 3)
         #expect(RetryPolicy.aggressive.maxRetries == 5)
     }
 

@@ -53,7 +53,7 @@ struct PrivilegedProxyWriteTests {
         let serviceName = try await getTestServiceName()
 
         // 1. Backup current configuration
-        let originalConfig = try await SystemProxyKit.current(for: serviceName)
+        let originalConfig = try await SystemProxyKit.getProxy(for: serviceName)
         print("Original config: \(originalConfig)")
 
         // 2. Set test proxy
@@ -73,7 +73,7 @@ struct PrivilegedProxyWriteTests {
         print("Set test proxy configuration")
 
         // 3. Verify changes took effect
-        let verifyConfig = try await SystemProxyKit.current(for: serviceName)
+        let verifyConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         #expect(verifyConfig.httpProxy?.host == "127.0.0.1")
         #expect(verifyConfig.httpProxy?.port == 18080)
@@ -94,7 +94,7 @@ struct PrivilegedProxyWriteTests {
         let serviceName = try await getTestServiceName()
 
         // Backup
-        let originalConfig = try await SystemProxyKit.current(for: serviceName)
+        let originalConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         // Set SOCKS proxy
         var testConfig = originalConfig
@@ -107,7 +107,7 @@ struct PrivilegedProxyWriteTests {
         try await SystemProxyKit.setProxy(testConfig, for: serviceName)
 
         // Verify
-        let verifyConfig = try await SystemProxyKit.current(for: serviceName)
+        let verifyConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         #expect(verifyConfig.socksProxy?.host == "127.0.0.1")
         #expect(verifyConfig.socksProxy?.port == 11080)
@@ -124,7 +124,7 @@ struct PrivilegedProxyWriteTests {
         let serviceName = try await getTestServiceName()
 
         // Backup
-        let originalConfig = try await SystemProxyKit.current(for: serviceName)
+        let originalConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         // Set PAC
         var testConfig = originalConfig
@@ -136,7 +136,7 @@ struct PrivilegedProxyWriteTests {
         try await SystemProxyKit.setProxy(testConfig, for: serviceName)
 
         // Verify
-        let verifyConfig = try await SystemProxyKit.current(for: serviceName)
+        let verifyConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         #expect(verifyConfig.autoConfigURL?.url.absoluteString == "http://example.com/proxy.pac")
         #expect(verifyConfig.autoConfigURL?.isEnabled == true)
@@ -152,7 +152,7 @@ struct PrivilegedProxyWriteTests {
         let serviceName = try await getTestServiceName()
 
         // Backup
-        let originalConfig = try await SystemProxyKit.current(for: serviceName)
+        let originalConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         // First set some proxies
         var testConfig = originalConfig
@@ -165,7 +165,7 @@ struct PrivilegedProxyWriteTests {
         try await SystemProxyKit.disableAllProxies(for: serviceName)
 
         // Verify
-        let verifyConfig = try await SystemProxyKit.current(for: serviceName)
+        let verifyConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         #expect(!verifyConfig.hasAnyProxyEnabled)
         #expect(!verifyConfig.autoDiscoveryEnabled)
@@ -182,7 +182,7 @@ struct PrivilegedProxyWriteTests {
         let serviceName = try await getTestServiceName()
 
         // Backup
-        let originalConfig = try await SystemProxyKit.current(for: serviceName)
+        let originalConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         // Set exception list
         var testConfig = originalConfig
@@ -192,7 +192,7 @@ struct PrivilegedProxyWriteTests {
         try await SystemProxyKit.setProxy(testConfig, for: serviceName)
 
         // Verify
-        let verifyConfig = try await SystemProxyKit.current(for: serviceName)
+        let verifyConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         #expect(verifyConfig.excludeSimpleHostnames == true)
         #expect(verifyConfig.exceptionList.contains("*.local"))
@@ -209,13 +209,13 @@ struct PrivilegedProxyWriteTests {
         let serviceName = try await getTestServiceName()
 
         // Backup
-        let originalConfig = try await SystemProxyKit.current(for: serviceName)
+        let originalConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         // Use convenience method
         try await SystemProxyKit.setHTTPProxy(host: "127.0.0.1", port: 19999, for: serviceName)
 
         // Verify
-        let verifyConfig = try await SystemProxyKit.current(for: serviceName)
+        let verifyConfig = try await SystemProxyKit.getProxy(for: serviceName)
 
         #expect(verifyConfig.httpProxy?.host == "127.0.0.1")
         #expect(verifyConfig.httpProxy?.port == 19999)
@@ -225,6 +225,103 @@ struct PrivilegedProxyWriteTests {
         // Restore
         try await SystemProxyKit.setProxy(originalConfig, for: serviceName)
         print("✅ Restored original configuration")
+    }
+
+    // MARK: - Batch Operation Tests
+
+    @Test("Batch set proxy for multiple services")
+    func batchSetProxy() async throws {
+        if skipIfNotRoot() { return }
+
+        // Get all enabled services
+        let services = try await SystemProxyKit.allServicesInfo()
+        let enabledServices = services.filter { $0.isEnabled }.map { $0.name }
+
+        guard !enabledServices.isEmpty else {
+            print("⏭️ Skipping: No enabled services found")
+            return
+        }
+
+        // Backup all configurations
+        var originalConfigs: [(service: String, config: ProxyConfiguration)] = []
+        for service in enabledServices {
+            let config = try await SystemProxyKit.getProxy(for: service)
+            originalConfigs.append((service, config))
+        }
+
+        // Create test configuration
+        var testConfig = ProxyConfiguration()
+        testConfig.httpProxy = ProxyServer(host: "127.0.0.1", port: 28080, isEnabled: true)
+        testConfig.httpsProxy = ProxyServer(host: "127.0.0.1", port: 28080, isEnabled: true)
+
+        // Batch set proxy
+        let configurations = enabledServices.map { (interface: $0, config: testConfig) }
+        let result = try await SystemProxyKit.setProxy(configurations: configurations)
+
+        print("Batch result: \(result)")
+        #expect(result.successCount > 0)
+
+        // Verify all succeeded services were set correctly
+        for service in result.succeeded {
+            let verifyConfig = try await SystemProxyKit.getProxy(for: service)
+            #expect(verifyConfig.httpProxy?.host == "127.0.0.1")
+            #expect(verifyConfig.httpProxy?.port == 28080)
+            print("✅ Verified proxy for \(service)")
+        }
+
+        // Restore all configurations
+        let restoreConfigs = originalConfigs.map { (interface: $0.service, config: $0.config) }
+        _ = try await SystemProxyKit.setProxy(configurations: restoreConfigs)
+        print("✅ Restored all configurations")
+    }
+
+    @Test("Batch set proxy with empty configurations returns empty result")
+    func batchSetProxyEmptyConfigurations() async throws {
+        if skipIfNotRoot() { return }
+
+        // Empty configurations should return empty result, not throw
+        let result = try await SystemProxyKit.setProxy(configurations: [])
+
+        #expect(result.succeeded.isEmpty)
+        #expect(result.failed.isEmpty)
+        #expect(result.allSucceeded)
+        print("✅ Empty configurations handled correctly")
+    }
+
+    @Test("Set proxy for all enabled services convenience method")
+    func setProxyForAllEnabledServices() async throws {
+        if skipIfNotRoot() { return }
+
+        // Get enabled services count
+        let services = try await SystemProxyKit.allServicesInfo()
+        let enabledServices = services.filter { $0.isEnabled }
+
+        guard !enabledServices.isEmpty else {
+            print("⏭️ Skipping: No enabled services found")
+            return
+        }
+
+        // Backup all configurations
+        var originalConfigs: [(service: String, config: ProxyConfiguration)] = []
+        for service in enabledServices {
+            let config = try await SystemProxyKit.getProxy(for: service.name)
+            originalConfigs.append((service.name, config))
+        }
+
+        // Create test configuration
+        var testConfig = ProxyConfiguration()
+        testConfig.socksProxy = ProxyServer(host: "127.0.0.1", port: 21080, isEnabled: true)
+
+        // Use convenience method
+        let result = try await SystemProxyKit.setProxyForAllEnabledServices(testConfig)
+
+        print("Set proxy for all enabled services result: \(result)")
+        #expect(result.successCount > 0)
+
+        // Restore all configurations
+        let restoreConfigs = originalConfigs.map { (interface: $0.service, config: $0.config) }
+        _ = try await SystemProxyKit.setProxy(configurations: restoreConfigs)
+        print("✅ Restored all configurations")
     }
 }
 

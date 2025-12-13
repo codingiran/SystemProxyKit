@@ -71,7 +71,7 @@ struct ProxyConfigurationReadTests {
     @Test("Can read proxy configuration from first available service")
     func readFirstServiceConfig() async throws {
         let serviceName = try await getFirstAvailableService()
-        let config = try await SystemProxyKit.current(for: serviceName)
+        let config = try await SystemProxyKit.getProxy(for: serviceName)
 
         // Configuration should be valid (regardless of specific content)
         print("Configuration for '\(serviceName)': \(config)")
@@ -86,7 +86,7 @@ struct ProxyConfigurationReadTests {
             return
         }
 
-        let config = try await SystemProxyKit.current(for: "Wi-Fi")
+        let config = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 
         print("Wi-Fi proxy configuration:")
         print("  - Auto Discovery: \(config.autoDiscoveryEnabled)")
@@ -98,17 +98,21 @@ struct ProxyConfigurationReadTests {
         print("  - Exception List: \(config.exceptionList)")
     }
 
-    @Test("Reading non-existent service throws serviceNotFound error")
+    @Test("Reading non-existent service throws serviceNotFound or configurationNotFound error")
     func readNonExistentService() async {
         do {
-            _ = try await SystemProxyKit.current(for: "NonExistentService12345")
-            Issue.record("Expected serviceNotFound error")
+            _ = try await SystemProxyKit.getProxy(for: "NonExistentService12345")
+            Issue.record("Expected serviceNotFound or configurationNotFound error")
         } catch let error as SystemProxyError {
-            guard case let .serviceNotFound(name) = error else {
-                Issue.record("Expected serviceNotFound, got \(error)")
-                return
+            // Either serviceNotFound (from batch lookup) or configurationNotFound (from single wrapper) is acceptable
+            switch error {
+            case let .serviceNotFound(name):
+                #expect(name == "NonExistentService12345")
+            case let .configurationNotFound(serviceName):
+                #expect(serviceName == "NonExistentService12345")
+            default:
+                Issue.record("Expected serviceNotFound or configurationNotFound, got \(error)")
             }
-            #expect(name == "NonExistentService12345")
         } catch {
             Issue.record("Unexpected error type: \(error)")
         }
@@ -120,7 +124,7 @@ struct ProxyConfigurationReadTests {
 
         // Read multiple times consecutively
         for i in 1 ... 5 {
-            let config = try await SystemProxyKit.current(for: serviceName)
+            let config = try await SystemProxyKit.getProxy(for: serviceName)
             print("Read #\(i): hasAnyProxyEnabled = \(config.hasAnyProxyEnabled)")
         }
     }
@@ -133,7 +137,7 @@ struct ProxyConfigurationReadTests {
         await withTaskGroup(of: ProxyConfiguration?.self) { group in
             for _ in 1 ... 10 {
                 group.addTask {
-                    try? await SystemProxyKit.current(for: serviceName)
+                    try? await SystemProxyKit.getProxy(for: serviceName)
                 }
             }
 

@@ -44,8 +44,11 @@ public extension RetryPolicy {
     /// No retry
     static let none = RetryPolicy(maxRetries: 0, delay: 0, backoffMultiplier: 1.0)
 
-    /// Default policy: 3 retries, 0.5s initial delay, 2x exponential backoff
-    static let `default` = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
+    /// Default policy: no retry
+    static let `default` = RetryPolicy.none
+
+    /// Standard policy: 3 retries, 0.5s initial delay, 2x exponential backoff
+    static let standard = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
 
     /// Aggressive policy: 5 retries, 0.2s initial delay, 1.5x exponential backoff
     static let aggressive = RetryPolicy(maxRetries: 5, delay: 0.2, backoffMultiplier: 1.5)

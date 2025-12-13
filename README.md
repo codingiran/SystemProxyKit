@@ -43,15 +43,21 @@ Or add it through Xcode:
 ```swift
 import SystemProxyKit
 
-// Get current proxy settings
-let config = try await SystemProxyKit.current(for: "Wi-Fi")
+// Get current proxy settings for a single interface
+let config = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 print(config)
+
+// Get configurations for multiple interfaces
+let configs = try await SystemProxyKit.getProxy(for: ["Wi-Fi", "Ethernet"])
+for (interface, config) in configs {
+    print("\(interface): \(config)")
+}
 ```
 
 ### Setting HTTP Proxy
 
 ```swift
-// Quick method
+// Quick method for single interface
 try await SystemProxyKit.setHTTPProxy(
     host: "127.0.0.1",
     port: 7890,
@@ -59,10 +65,24 @@ try await SystemProxyKit.setHTTPProxy(
 )
 
 // Or configure manually
-var config = try await SystemProxyKit.current(for: "Wi-Fi")
+var config = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 config.httpProxy = ProxyServer(host: "127.0.0.1", port: 7890, isEnabled: true)
 config.httpsProxy = ProxyServer(host: "127.0.0.1", port: 7890, isEnabled: true)
 try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
+```
+
+### Batch Proxy Configuration
+
+```swift
+// Set same proxy for multiple interfaces (single commit/apply for efficiency)
+var config = ProxyConfiguration()
+config.httpProxy = ProxyServer(host: "127.0.0.1", port: 7890, isEnabled: true)
+
+let result = try await SystemProxyKit.setProxy(config, for: ["Wi-Fi", "Ethernet", "Thunderbolt Bridge"])
+print("Succeeded: \(result.succeeded), Failed: \(result.failed.count)")
+
+// Or set for all enabled services
+let result = try await SystemProxyKit.setProxyForAllEnabledServices(config)
 ```
 
 ### PAC Configuration
@@ -76,7 +96,7 @@ try await SystemProxyKit.setPACProxy(url: pacURL, for: "Wi-Fi")
 
 ```swift
 // 1. Backup original settings
-let original = try await SystemProxyKit.current(for: "Wi-Fi")
+let original = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 
 // 2. Apply new configuration
 try await SystemProxyKit.setHTTPProxy(host: "127.0.0.1", port: 7890, for: "Wi-Fi")
@@ -94,19 +114,25 @@ try await SystemProxyKit.setProxy(original, for: "Wi-Fi")
 - **`ProxyConfiguration`**: Complete proxy settings for a network interface
 - **`ProxyServer`**: Individual proxy server with optional authentication
 - **`PACConfiguration`**: PAC (Proxy Auto-Configuration) settings
-- **`RetryPolicy`**: Configurable retry strategy
+- **`BatchProxyResult`**: Result of batch operations with succeeded/failed lists
+- **`RetryPolicy`**: Configurable retry strategy (default: no retry)
 
 ### Main APIs
 
 ```swift
-// Get proxy configuration
-func current(for interface: String) async throws -> ProxyConfiguration
+// Get proxy configuration (single or batch)
+func getProxy(for interface: String) async throws -> ProxyConfiguration
+func getProxy(for interfaces: [String]) async throws -> [(interface: String, config: ProxyConfiguration)]
 
-// Set proxy configuration
+// Set proxy configuration (single or batch)
 func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
+func setProxy(_ config: ProxyConfiguration, for interfaces: [String]) async throws -> BatchProxyResult
+func setProxy(configurations: [(interface: String, config: ProxyConfiguration)]) async throws -> BatchProxyResult
+func setProxyForAllEnabledServices(_ config: ProxyConfiguration) async throws -> BatchProxyResult
 
 // List network services
 func availableServices() async throws -> [String]
+func allServicesInfo() async throws -> [ServiceInfo]
 
 // Disable all proxies
 func disableAllProxies(for interface: String) async throws
