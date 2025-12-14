@@ -13,6 +13,26 @@ A Swift Package for managing macOS system network proxy settings with a type-saf
 - **Retry Strategy**: Configurable retry policies for reliability
 - **Snapshot & Rollback**: Easy backup and restore of proxy settings
 
+## Command Line Tool
+
+SystemProxyKit also provides `sysproxy`, a standalone CLI tool for managing proxies from the terminal:
+
+```bash
+# List network services
+sysproxy list
+
+# Get proxy configuration
+sysproxy get Wi-Fi
+
+# Set HTTP proxy (requires sudo)
+sudo sysproxy set http --host 127.0.0.1 --port 7890 --interface Wi-Fi
+
+# Disable all proxies
+sudo sysproxy disable Wi-Fi
+```
+
+For detailed CLI usage, see [CLI_Guide.md](./CLI_Guide.md).
+
 ## Requirements
 
 - macOS 10.15+

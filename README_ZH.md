@@ -13,6 +13,26 @@
 - **重试策略**：可配置的重试策略以提高可靠性
 - **快照与回滚**：轻松备份和恢复代理设置
 
+## 命令行工具
+
+SystemProxyKit 还提供了 `sysproxy` 命令行工具，可在终端中管理代理设置：
+
+```bash
+# 列出网络服务
+sysproxy list
+
+# 获取代理配置
+sysproxy get Wi-Fi
+
+# 设置 HTTP 代理（需要 sudo）
+sudo sysproxy set http --host 127.0.0.1 --port 7890 --interface Wi-Fi
+
+# 禁用所有代理
+sudo sysproxy disable Wi-Fi
+```
+
+详细 CLI 使用说明请参阅 [CLI_Guide.md](./CLI_Guide.md)。
+
 ## 系统要求
 
 - macOS 10.15+
