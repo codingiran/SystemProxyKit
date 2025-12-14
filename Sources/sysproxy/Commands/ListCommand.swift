@@ -36,7 +36,7 @@ struct List: AsyncParsableCommand {
                 let status = service.isEnabled ? "✓ Enabled" : "✗ Disabled"
                 print("  \(service.name)")
                 print("    Status: \(status)")
-                if let interfaceType = service.interfaceType {
+                if let interfaceType = service.rawInterfaceType {
                     print("    Interface Type: \(interfaceType)")
                 }
                 if let bsdName = service.bsdName {
