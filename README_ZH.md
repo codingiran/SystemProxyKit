@@ -81,9 +81,14 @@ config.httpProxy = ProxyServer(host: "127.0.0.1", port: 7890, isEnabled: true)
 let result = try await SystemProxyKit.setProxy(config, for: ["Wi-Fi", "Ethernet", "Thunderbolt Bridge"])
 print("成功: \(result.succeeded), 失败: \(result.failed.count)")
 
-// 或使用过滤器为特定服务设置（如只设置物理网卡，排除 VPN）
+// 或使用过滤器为特定服务设置（如只设置物理网卡）
 let result = try await SystemProxyKit.setProxy(config, for: { service in
-    service.isEnabled && service.interfaceType != "PPP"  // 排除 VPN
+    service.isEnabled && service.interfaceType.isPhysical  // 仅 Wi-Fi、以太网、蜂窝网络
+})
+
+// 或排除 VPN 服务（Surge、Shadowrocket 等）
+let result = try await SystemProxyKit.setProxy(config, for: {
+    $0.isEnabled && !$0.interfaceType.isVPN
 })
 ```
 
@@ -117,6 +122,10 @@ try await SystemProxyKit.setProxy(original, for: "Wi-Fi")
 - **`ProxyServer`**：单个代理服务器，支持可选认证
 - **`PACConfiguration`**：PAC（代理自动配置）设置
 - **`BatchProxyResult`**：批量操作结果，包含成功/失败列表
+- **`ServiceInfo`**：网络服务信息，包含 `name`、`bsdName`、`rawInterfaceType`、`interfaceType`、`isEnabled`
+- **`InterfaceType`**：简化的接口类型枚举：`.wifi`、`.cellular`、`.wiredEthernet`、`.bridge`、`.loopback`、`.vpn`、`.other`
+  - `isPhysical`：wifi、cellular、wiredEthernet 返回 `true`
+  - `isVPN`：vpn 返回 `true`
 - **`RetryPolicy`**：可配置的重试策略（默认：不重试）
 
 ### 主要 API

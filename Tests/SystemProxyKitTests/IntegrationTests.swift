@@ -34,7 +34,37 @@ struct NetworkServiceDiscoveryTests {
         for info in servicesInfo {
             // Each service should have a name
             #expect(!info.name.isEmpty, "Service name should not be empty")
-            print("Service: \(info.name), BSD: \(info.bsdName ?? "N/A"), Type: \(info.interfaceType ?? "N/A"), Enabled: \(info.isEnabled)")
+            print("Service: \(info.name), BSD: \(info.bsdName ?? "N/A"), Type: \(info.rawInterfaceType ?? "N/A") (\(info.interfaceType)), Enabled: \(info.isEnabled)")
+        }
+    }
+
+    @Test("Interface types are properly classified for real services")
+    func interfaceTypeClassification() async throws {
+        let servicesInfo = try await SystemProxyKit.allServicesInfo()
+
+        for info in servicesInfo {
+            // If rawInterfaceType is a known type, it should not be classified as .other
+            if let rawType = info.rawInterfaceType {
+                switch rawType {
+                case "IEEE80211":
+                    #expect(info.interfaceType == .wifi, "IEEE80211 should be classified as wifi")
+                case "Ethernet", "FireWire":
+                    #expect(info.interfaceType == .wiredEthernet, "Ethernet/FireWire should be classified as wiredEthernet")
+                case "WWAN":
+                    #expect(info.interfaceType == .cellular, "WWAN should be classified as cellular")
+                case "Bridge", "Bond", "VLAN":
+                    #expect(info.interfaceType == .bridge, "Bridge/Bond/VLAN should be classified as bridge")
+                case "Loopback":
+                    #expect(info.interfaceType == .loopback, "Loopback should be classified as loopback")
+                case "PPP", "IPSec", "L2TP", "PPTP", "6to4", "VPN":
+                    #expect(info.interfaceType == .vpn, "\(rawType) should be classified as vpn")
+                case "Bluetooth", "Modem", "Serial", "IrDA":
+                    #expect(info.interfaceType == .other, "\(rawType) should be classified as other")
+                default:
+                    // Log unknown types for future consideration
+                    print("⚠️ Unknown rawInterfaceType: \(rawType) -> \(info.interfaceType)")
+                }
+            }
         }
     }
 

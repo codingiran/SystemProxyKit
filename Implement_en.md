@@ -150,6 +150,36 @@ Result of batch proxy configuration operations.
 | `successCount` | `Int` | Number of successful operations |
 | `failureCount` | `Int` | Number of failed operations |
 
+### 3.6 `ServiceInfo`
+
+Network service information structure.
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `name` | `String` | Service name (e.g., "Wi-Fi", "Ethernet") |
+| `bsdName` | `String?` | BSD device name (e.g., "en0", "en1") |
+| `rawInterfaceType` | `String?` | Raw interface type from SystemConfiguration (e.g., "IEEE80211", "Ethernet", "VPN") |
+| `interfaceType` | `InterfaceType` | Simplified interface category |
+| `isEnabled` | `Bool` | Whether the service is enabled |
+
+### 3.7 `InterfaceType`
+
+Simplified network interface type category enum.
+
+| Case | Raw Types | Description |
+| :--- | :--- | :--- |
+| `.wifi` | IEEE80211 | Wi-Fi interfaces |
+| `.cellular` | WWAN | Cellular/mobile network |
+| `.wiredEthernet` | Ethernet, FireWire | Wired connections (USB Ethernet, Thunderbolt Ethernet, etc.) |
+| `.bridge` | Bridge, Bond, VLAN | Bridge/aggregated interfaces |
+| `.loopback` | Loopback | Loopback interface |
+| `.vpn` | PPP, IPSec, L2TP, PPTP, 6to4, VPN | VPN tunnels (Surge, Shadowrocket, Tailscale, etc.) |
+| `.other` | Bluetooth, Modem, Serial, etc. | Other/unknown types |
+
+**Convenience Properties:**
+- `isPhysical: Bool` - Returns `true` for wifi, cellular, wiredEthernet
+- `isVPN: Bool` - Returns `true` for vpn
+
 -----
 
 ## 4. Mapping Layer Design
