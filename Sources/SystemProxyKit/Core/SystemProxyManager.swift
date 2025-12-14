@@ -120,6 +120,7 @@ public actor SystemProxyManager {
     ///   - retryPolicy: Retry policy
     /// - Returns: BatchProxyResult containing succeeded and failed services
     /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    @discardableResult
     public func setProxy(
         configurations: [(interface: String, config: ProxyConfiguration)],
         authRef: AuthorizationRef? = nil,
@@ -143,6 +144,7 @@ public actor SystemProxyManager {
     ///   - retryPolicy: Retry policy
     /// - Returns: BatchProxyResult containing succeeded and failed services
     /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    @discardableResult
     public func setProxy(
         _ configuration: ProxyConfiguration,
         for interfaces: [String],

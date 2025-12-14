@@ -68,6 +68,7 @@ public enum SystemProxyKit {
     ///   - retryPolicy: Retry policy, defaults to .default
     /// - Returns: BatchProxyResult containing succeeded and failed services
     /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    @discardableResult
     public static func setProxy(
         configurations: [(interface: String, config: ProxyConfiguration)],
         retryPolicy: RetryPolicy = .default
@@ -85,6 +86,7 @@ public enum SystemProxyKit {
     ///   - retryPolicy: Retry policy, defaults to .default
     /// - Returns: BatchProxyResult containing succeeded and failed services
     /// - Throws: SystemProxyError for infrastructure failures or when all operations fail
+    @discardableResult
     public static func setProxy(
         _ config: ProxyConfiguration,
         for interfaces: [String],
@@ -104,6 +106,7 @@ public enum SystemProxyKit {
     ///   - retryPolicy: Retry policy, defaults to .default
     /// - Returns: BatchProxyResult containing succeeded and failed services
     /// - Throws: SystemProxyError
+    @discardableResult
     public static func setProxy(
         _ config: ProxyConfiguration,
         for interfaceFilter: @escaping @Sendable (NetworkServiceHelper.ServiceInfo) -> Bool,
