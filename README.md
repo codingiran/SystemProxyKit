@@ -208,7 +208,7 @@ SystemProxyKit follows a layered architecture:
 - **Utils**: Error definitions and constants
 - **Interface**: Public API entry point
 
-See [Implement_en.md](./Implement_en.md) for detailed technical design.
+See [Implement_en.md](./Implement.md) for detailed technical design.
 
 ## License
 

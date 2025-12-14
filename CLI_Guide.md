@@ -1,16 +1,16 @@
-# sysproxy CLI 操作指南
+# sysproxy CLI Guide
 
-`sysproxy` 是 SystemProxyKit 提供的命令行工具，用于管理 macOS 系统代理设置。
+`sysproxy` is a command-line tool provided by SystemProxyKit for managing macOS system proxy settings.
 
-## 安装与运行
+## Installation and Usage
 
-### 开发环境
+### Development Environment
 ```bash
 cd /path/to/SystemProxyKit
 swift run sysproxy [command]
 ```
 
-### 构建安装
+### Build and Install
 ```bash
 swift build -c release
 sudo cp .build/release/sysproxy /usr/local/bin/
@@ -19,46 +19,46 @@ sysproxy [command]
 
 ---
 
-## 命令概览
+## Command Overview
 
-| 命令 | 说明 | 需要 Root |
-|------|------|:---------:|
-| `list` | 列出所有网络服务 | ❌ |
-| `get` | 获取代理配置 | ❌ |
-| `set` | 设置代理 | ✅ |
-| `disable` | 禁用代理 | ✅ |
+| Command | Description | Requires Root |
+|---------|-------------|:-------------:|
+| `list` | List all network services | ❌ |
+| `get` | Get proxy configuration | ❌ |
+| `set` | Set proxy configuration | ✅ |
+| `disable` | Disable proxies | ✅ |
 
 ---
 
-## list - 列出网络服务
+## list - List Network Services
 
-列出系统中所有可用的网络服务。
+List all available network services on the system.
 
 ```bash
 sysproxy list [OPTIONS]
 ```
 
-### 选项
+### Options
 
-| 选项 | 说明 |
-|------|------|
-| `-e, --enabled-only` | 仅显示已启用的服务 |
-| `-v, --verbose` | 显示详细信息 |
+| Option | Description |
+|--------|-------------|
+| `-e, --enabled-only` | Show only enabled services |
+| `-v, --verbose` | Show detailed information |
 
-### 示例
+### Examples
 
 ```bash
-# 列出所有服务
+# List all services
 sysproxy list
 
-# 仅列出已启用的服务
+# List only enabled services
 sysproxy list --enabled-only
 
-# 显示详细信息
+# Show detailed information
 sysproxy list --verbose
 ```
 
-### 输出示例
+### Output Example
 
 ```
 Available Network Services:
@@ -71,37 +71,37 @@ Total: 3 service(s)
 
 ---
 
-## get - 获取代理配置
+## get - Get Proxy Configuration
 
-获取指定网络接口的当前代理配置。
+Get current proxy configuration for a specified network interface.
 
 ```bash
 sysproxy get <INTERFACE> [OPTIONS]
 ```
 
-### 参数
+### Arguments
 
-| 参数 | 说明 |
-|------|------|
-| `<INTERFACE>` | 网络接口名称，如 `Wi-Fi`、`Ethernet` |
+| Argument | Description |
+|----------|-------------|
+| `<INTERFACE>` | Network interface name, e.g., `Wi-Fi`, `Ethernet` |
 
-### 选项
+### Options
 
-| 选项 | 说明 |
-|------|------|
-| `-j, --json` | 以 JSON 格式输出 |
+| Option | Description |
+|--------|-------------|
+| `-j, --json` | Output in JSON format |
 
-### 示例
+### Examples
 
 ```bash
-# 获取 Wi-Fi 的代理配置
+# Get Wi-Fi proxy configuration
 sysproxy get Wi-Fi
 
-# 以 JSON 格式输出
+# Output in JSON format
 sysproxy get Wi-Fi --json
 ```
 
-### 输出示例
+### Output Example
 
 ```
 Proxy Configuration for 'Wi-Fi':
@@ -133,69 +133,69 @@ Proxy Configuration for 'Wi-Fi':
 
 ---
 
-## set - 设置代理
+## set - Set Proxy Configuration
 
-设置指定网络接口的代理配置。**需要 root 权限**。
+Set proxy configuration for a specified network interface. **Requires root privileges**.
 
 ```bash
 sudo sysproxy set <TYPE> [OPTIONS]
 ```
 
-### 代理类型
+### Proxy Types
 
-| 类型 | 说明 |
-|------|------|
-| `http` | HTTP 代理 |
-| `https` | HTTPS 代理 |
-| `socks` | SOCKS 代理 |
-| `pac` | PAC 自动配置 |
+| Type | Description |
+|------|-------------|
+| `http` | HTTP proxy |
+| `https` | HTTPS proxy |
+| `socks` | SOCKS proxy |
+| `pac` | PAC auto-configuration |
 
 ---
 
-### set http - 设置 HTTP 代理
+### set http - Set HTTP Proxy
 
 ```bash
 sudo sysproxy set http --host <HOST> --port <PORT> --interface <INTERFACE> [OPTIONS]
 ```
 
-#### 选项
+#### Options
 
-| 选项 | 说明 |
-|------|------|
-| `-h, --host` | 代理服务器地址 (必需) |
-| `-p, --port` | 代理服务器端口 (必需) |
-| `-i, --interface` | 网络接口名称 (必需) |
-| `--username` | 认证用户名 (可选) |
-| `--password` | 认证密码 (可选) |
-| `--with-https` | 同时设置 HTTPS 代理 |
+| Option | Description |
+|--------|-------------|
+| `-h, --host` | Proxy server host (required) |
+| `-p, --port` | Proxy server port (required) |
+| `-i, --interface` | Network interface name (required) |
+| `--username` | Authentication username (optional) |
+| `--password` | Authentication password (optional) |
+| `--with-https` | Also set HTTPS proxy with the same settings |
 
-#### 示例
+#### Examples
 
 ```bash
-# 设置 HTTP 代理
+# Set HTTP proxy
 sudo sysproxy set http --host 127.0.0.1 --port 7890 --interface Wi-Fi
 
-# 同时设置 HTTP 和 HTTPS 代理
+# Set both HTTP and HTTPS proxy
 sudo sysproxy set http --host 127.0.0.1 --port 7890 --interface Wi-Fi --with-https
 
-# 带认证的代理
+# Set proxy with authentication
 sudo sysproxy set http --host proxy.example.com --port 8080 --interface Wi-Fi \
     --username user --password pass
 ```
 
 ---
 
-### set https - 设置 HTTPS 代理
+### set https - Set HTTPS Proxy
 
 ```bash
 sudo sysproxy set https --host <HOST> --port <PORT> --interface <INTERFACE> [OPTIONS]
 ```
 
-#### 选项
+#### Options
 
-与 `set http` 相同（不含 `--with-https`）。
+Same as `set http` (excluding `--with-https`).
 
-#### 示例
+#### Examples
 
 ```bash
 sudo sysproxy set https --host 127.0.0.1 --port 7890 --interface Wi-Fi
@@ -203,45 +203,45 @@ sudo sysproxy set https --host 127.0.0.1 --port 7890 --interface Wi-Fi
 
 ---
 
-### set socks - 设置 SOCKS 代理
+### set socks - Set SOCKS Proxy
 
 ```bash
 sudo sysproxy set socks --host <HOST> --port <PORT> --interface <INTERFACE> [OPTIONS]
 ```
 
-#### 选项
+#### Options
 
-| 选项 | 说明 |
-|------|------|
-| `-h, --host` | 代理服务器地址 (必需) |
-| `-p, --port` | 代理服务器端口 (必需) |
-| `-i, --interface` | 网络接口名称 (必需) |
-| `--username` | 认证用户名 (可选) |
-| `--password` | 认证密码 (可选) |
+| Option | Description |
+|--------|-------------|
+| `-h, --host` | Proxy server host (required) |
+| `-p, --port` | Proxy server port (required) |
+| `-i, --interface` | Network interface name (required) |
+| `--username` | Authentication username (optional) |
+| `--password` | Authentication password (optional) |
 
-#### 示例
+#### Examples
 
 ```bash
-# 设置 SOCKS5 代理
+# Set SOCKS5 proxy
 sudo sysproxy set socks --host 127.0.0.1 --port 1080 --interface Wi-Fi
 ```
 
 ---
 
-### set pac - 设置 PAC 自动配置
+### set pac - Set PAC Auto-Configuration
 
 ```bash
 sudo sysproxy set pac --url <URL> --interface <INTERFACE>
 ```
 
-#### 选项
+#### Options
 
-| 选项 | 说明 |
-|------|------|
-| `-u, --url` | PAC 脚本 URL (必需) |
-| `-i, --interface` | 网络接口名称 (必需) |
+| Option | Description |
+|--------|-------------|
+| `-u, --url` | PAC script URL (required) |
+| `-i, --interface` | Network interface name (required) |
 
-#### 示例
+#### Examples
 
 ```bash
 sudo sysproxy set pac --url "http://example.com/proxy.pac" --interface Wi-Fi
@@ -249,124 +249,124 @@ sudo sysproxy set pac --url "http://example.com/proxy.pac" --interface Wi-Fi
 
 ---
 
-## disable - 禁用代理
+## disable - Disable Proxies
 
-禁用指定网络接口的所有代理设置。**需要 root 权限**。
+Disable all proxy settings for a specified network interface. **Requires root privileges**.
 
 ```bash
 sudo sysproxy disable <INTERFACE>
 sudo sysproxy disable --all
 ```
 
-### 参数
+### Arguments
 
-| 参数 | 说明 |
-|------|------|
-| `<INTERFACE>` | 网络接口名称 |
+| Argument | Description |
+|----------|-------------|
+| `<INTERFACE>` | Network interface name |
 
-### 选项
+### Options
 
-| 选项 | 说明 |
-|------|------|
-| `-a, --all` | 禁用所有已启用网络服务的代理 |
+| Option | Description |
+|--------|-------------|
+| `-a, --all` | Disable proxies for all enabled network services |
 
-### 示例
+### Examples
 
 ```bash
-# 禁用 Wi-Fi 的所有代理
+# Disable all proxies for Wi-Fi
 sudo sysproxy disable Wi-Fi
 
-# 禁用所有服务的代理
+# Disable proxies for all services
 sudo sysproxy disable --all
 ```
 
 ---
 
-## 常用场景
+## Common Use Cases
 
-### 场景 1: 快速开启/关闭代理
+### Use Case 1: Quick Enable/Disable Proxy
 
 ```bash
-# 开启 HTTP/HTTPS 代理 (Clash/V2Ray 等)
+# Enable HTTP/HTTPS proxy (Clash/V2Ray, etc.)
 sudo sysproxy set http --host 127.0.0.1 --port 7890 --interface Wi-Fi --with-https
 
-# 关闭代理
+# Disable proxy
 sudo sysproxy disable Wi-Fi
 ```
 
-### 场景 2: 使用 SOCKS5 代理
+### Use Case 2: Using SOCKS5 Proxy
 
 ```bash
-# 设置 SOCKS5 代理 (适用于 SSH 隧道等)
+# Set SOCKS5 proxy (SSH tunnel, etc.)
 sudo sysproxy set socks --host 127.0.0.1 --port 1080 --interface Wi-Fi
 ```
 
-### 场景 3: 使用 PAC 文件
+### Use Case 3: Using PAC File
 
 ```bash
-# 使用公司提供的 PAC 文件
+# Use company-provided PAC file
 sudo sysproxy set pac --url "http://wpad.company.com/proxy.pac" --interface Wi-Fi
 ```
 
-### 场景 4: 脚本自动化
+### Use Case 4: Script Automation
 
 ```bash
 #!/bin/bash
-# 连接 VPN 后自动设置代理
+# Automatically set proxy after VPN connection
 INTERFACE="Wi-Fi"
 PROXY_HOST="10.0.0.1"
 PROXY_PORT="8080"
 
-# 备份当前配置
+# Backup current configuration
 sysproxy get "$INTERFACE" --json > /tmp/proxy_backup.json
 
-# 设置代理
+# Set proxy
 sudo sysproxy set http --host "$PROXY_HOST" --port "$PROXY_PORT" --interface "$INTERFACE" --with-https
 
-# 工作完成后恢复
+# Restore when done
 # sudo sysproxy disable "$INTERFACE"
 ```
 
 ---
 
-## 故障排除
+## Troubleshooting
 
-### 权限不足
+### Permission Denied
 
 ```
 Error: Operation not permitted
 ```
 
-**解决方案**: 使用 `sudo` 运行需要修改系统设置的命令。
+**Solution**: Use `sudo` for commands that modify system settings.
 
-### 找不到网络服务
+### Network Service Not Found
 
 ```
 Error: Service not found: "WiFi"
 ```
 
-**解决方案**: 使用 `sysproxy list` 查看正确的服务名称。注意名称区分大小写，如 `Wi-Fi` 而非 `WiFi`。
+**Solution**: Use `sysproxy list` to check the correct service name. Note that names are case-sensitive, e.g., `Wi-Fi` not `WiFi`.
 
-### 代理设置未生效
+### Proxy Settings Not Applied
 
-**解决方案**:
-1. 检查代理服务器是否正常运行
-2. 打开系统偏好设置 → 网络 → 选择接口 → 高级 → 代理，验证设置是否正确
-3. 尝试重启网络服务或浏览器
+**Solutions**:
+1. Check if proxy server is running
+2. Open System Preferences → Network → Select interface → Advanced → Proxies to verify settings
+3. Try restarting network services or browser
 
 ---
 
-## 获取帮助
+## Getting Help
 
 ```bash
-# 查看主命令帮助
+# View main command help
 sysproxy --help
 
-# 查看子命令帮助
+# View subcommand help
 sysproxy get --help
 sysproxy set --help
 sysproxy set http --help
 
-# 查看版本
+# View version
 sysproxy --version
 ```

@@ -1,234 +1,236 @@
-# SystemProxyKit 技术设计文档
+# SystemProxyKit Technical Design Document
 
-**版本:** v1.0.0  
-**状态:** 待开发 (Draft)  
-**目标平台:** macOS 10.15+  
-**核心依赖:** `SystemConfiguration.framework`
-
----
-
-## 1. 项目概述 (Overview)
-
-`SystemProxyKit` 是一个专为 macOS 设计的 Swift Package，旨在提供一套类型安全、符合 Swift 语言习惯的 API，用于管理和修改系统网络代理设置。
-
-**核心价值：**
-
-1. **封装复杂性：** 屏蔽 `SystemConfiguration` 繁琐的 C 指针操作和字典映射。
-2. **快照与回滚：** 提供“读取-修改-恢复”的事务性操作能力，防止误操作导致用户网络中断。
-3. **精细化控制：** 支持 HTTP, HTTPS, SOCKS, PAC 自动配置及忽略列表的独立设置。
+**Version:** v1.0.0  
+**Status:** Implemented  
+**Target Platform:** macOS 10.15+  
+**Core Dependencies:** `SystemConfiguration.framework`
 
 ---
 
-## 2. 项目架构 (Architecture)
+## 1. Project Overview
 
-采用 **领域驱动设计 (DDD)** 思想，将数据模型、映射逻辑与系统交互逻辑分层。
+`SystemProxyKit` is a Swift Package designed specifically for macOS, providing a type-safe, idiomatic Swift API for managing and modifying system network proxy settings.
 
-### 2.1 文件目录结构
+**Core Value:**
+
+1. **Encapsulate Complexity:** Abstract away the tedious C pointer operations and dictionary mappings of `SystemConfiguration`.
+2. **Snapshot & Rollback:** Provide transactional "read-modify-restore" capabilities to prevent network disruption from misconfigurations.
+3. **Fine-Grained Control:** Support independent configuration of HTTP, HTTPS, SOCKS, PAC auto-configuration, and exception lists.
+
+---
+
+## 2. Project Architecture
+
+Adopts **Domain-Driven Design (DDD)** principles, separating data models, mapping logic, and system interaction logic into distinct layers.
+
+### 2.1 Directory Structure
 
 ```text
 SystemProxyKit/
 ├── Package.swift
 ├── Sources/
 │   └── SystemProxyKit/
-│       ├── Models/                # [数据层] 纯 Swift 结构体，无任何 SC 依赖
+│       ├── Models/                # [Data Layer] Pure Swift structs, no SC dependencies
 │       │   ├── ProxyConfiguration.swift
 │       │   ├── ProxyServer.swift
 │       │   ├── PACConfiguration.swift
 │       │   ├── BatchProxyResult.swift
 │       │   └── RetryPolicy.swift
-│       ├── Mapping/               # [转换层] 负责 Swift Model <-> SC Dictionary 互转
+│       ├── Mapping/               # [Conversion Layer] Swift Model <-> SC Dictionary conversion
 │       │   └── ProxyConfiguration+SC.swift
-│       ├── Core/                  # [逻辑层] 核心业务与系统交互
+│       ├── Core/                  # [Logic Layer] Core business and system interaction
 │       │   ├── SystemProxyManager.swift
 │       │   └── NetworkServiceHelper.swift
-│       ├── Utils/                 # [工具层] 错误定义与常量
+│       ├── Utils/                 # [Utility Layer] Error definitions and constants
 │       │   ├── SystemProxyError.swift
 │       │   └── SCConstants.swift
-│       └── SystemProxyKit.swift   # [接口层] 库的统一入口
+│       └── SystemProxyKit.swift   # [Interface Layer] Unified library entry point
 └── Tests/
     └── SystemProxyKitTests/
-        └── SystemProxyKitTests.swift
+        ├── SystemProxyKitTests.swift
+        ├── IntegrationTests.swift
+        └── PrivilegedIntegrationTests.swift
 ```
 
-### 2.2 数据流向图
+### 2.2 Data Flow Diagram
 
 ```mermaid
 graph TD
-    User[业务调用方] -->|1. 获取快照| Manager[SystemProxyManager]
-    Manager -->|2. 读取 SCPreferences| System[macOS SystemConfiguration]
-    System -->|3. 返回 Raw Dictionary| Manager
-    Manager -->|4. 映射转换| Mapper[Mapping Layer]
-    Mapper -->|5. 返回 ProxyConfiguration| User
+    User[Client Code] -->|1. Get Snapshot| Manager[SystemProxyManager]
+    Manager -->|2. Read SCPreferences| System[macOS SystemConfiguration]
+    System -->|3. Return Raw Dictionary| Manager
+    Manager -->|4. Map & Convert| Mapper[Mapping Layer]
+    Mapper -->|5. Return ProxyConfiguration| User
     
-    User -->|6. 设置新配置| Manager
-    Manager -->|7. 模型转字典| Mapper
-    Mapper -->|8. 返回 Raw Dictionary| Manager
-    Manager -->|9. 写入并应用| System
+    User -->|6. Set New Config| Manager
+    Manager -->|7. Model to Dictionary| Mapper
+    Mapper -->|8. Return Raw Dictionary| Manager
+    Manager -->|9. Write & Apply| System
 ```
 
 -----
 
-## 3\. 数据模型设计 (Data Models)
+## 3. Data Model Design
 
-数据层是纯净的 Swift Struct，不包含任何 SystemConfiguration 的引用，便于上层 UI 绑定和测试。
+The data layer consists of pure Swift structs with no `SystemConfiguration` references, making them ideal for UI binding and testing.
 
-> **线程安全：** 所有数据模型均遵循 `Sendable` 协议，确保在 Swift Concurrency 环境下安全传递。
+> **Thread Safety:** All data models conform to `Sendable` protocol, ensuring safe use in Swift Concurrency environments.
 
 ### 3.1 `ProxyServer`
 
-描述单个代理服务器节点，支持可选的认证信息。
+Represents a single proxy server node with optional authentication.
 
-| 属性 | 类型 | 说明 |
+| Property | Type | Description |
 | :--- | :--- | :--- |
-| `host` | `String` | 主机名或 IP 地址 |
-| `port` | `Int` | 端口号 |
-| `isEnabled` | `Bool` | 开关状态 |
-| `username` | `String?` | 认证用户名（可选） |
-| `password` | `String?` | 认证密码（可选，建议使用 Keychain 安全存储） |
+| `host` | `String` | Hostname or IP address |
+| `port` | `Int` | Port number |
+| `isEnabled` | `Bool` | Enable/disable state |
+| `username` | `String?` | Authentication username (optional) |
+| `password` | `String?` | Authentication password (optional, should use Keychain for secure storage) |
 
-> **安全提示：** 密码字段在序列化时需特别注意，建议通过 `Security.framework` 存入 Keychain，仅保存引用。
+> **Security Note:** The password field requires special care when serializing. It's recommended to store credentials in Keychain via `Security.framework` and only keep references.
 
 ### 3.2 `PACConfiguration`
 
-描述 PAC (Proxy Auto-Configuration) 自动代理配置，独立于 `ProxyServer`。
+Represents PAC (Proxy Auto-Configuration) settings, independent of `ProxyServer`.
 
-| 属性 | 类型 | 说明 |
+| Property | Type | Description |
 | :--- | :--- | :--- |
-| `url` | `URL` | PAC 脚本的 URL 地址 |
-| `isEnabled` | `Bool` | 开关状态 |
+| `url` | `URL` | URL of the PAC script |
+| `isEnabled` | `Bool` | Enable/disable state |
 
 ### 3.3 `ProxyConfiguration`
 
-描述完整的网络服务代理配置（对应系统偏好设置 UI）。
+Complete network service proxy configuration (corresponding to System Preferences UI).
 
-| 属性 | 类型 | 说明 |
+| Property | Type | Description |
 | :--- | :--- | :--- |
 | **Automatic** | | |
-| `autoDiscoveryEnabled` | `Bool` | 自动发现代理 (WPAD) |
-| `autoConfigURL` | `PACConfiguration?` | 自动代理配置 (PAC) |
+| `autoDiscoveryEnabled` | `Bool` | Auto-discover proxy (WPAD) |
+| `autoConfigURL` | `PACConfiguration?` | Auto proxy configuration (PAC) |
 | **Manual** | | |
-| `httpProxy` | `ProxyServer?` | 网页代理 (HTTP) |
-| `httpsProxy` | `ProxyServer?` | 安全网页代理 (HTTPS) |
-| `socksProxy` | `ProxyServer?` | SOCKS 代理 |
+| `httpProxy` | `ProxyServer?` | Web proxy (HTTP) |
+| `httpsProxy` | `ProxyServer?` | Secure web proxy (HTTPS) |
+| `socksProxy` | `ProxyServer?` | SOCKS proxy |
 | **Exceptions** | | |
-| `excludeSimpleHostnames`| `Bool` | 不包括简单主机名 |
-| `exceptionList` | `[String]` | 忽略的主机与域列表 |
+| `excludeSimpleHostnames`| `Bool` | Exclude simple hostnames |
+| `exceptionList` | `[String]` | Bypass proxy for these hosts and domains |
 
-> **设计决策：**
-> - `ProxyConfiguration` 必须遵循 `Equatable` 和 `Sendable` 协议。
-> - 本库**不支持** FTP 代理和 RTSP 流式代理（使用场景极少，已逐渐废弃）。
+> **Design Decision:**
+> - `ProxyConfiguration` must conform to `Equatable` and `Sendable` protocols.
+> - This library **does not support** FTP proxy and RTSP streaming proxy (rarely used, gradually deprecated).
 
 ### 3.4 `RetryPolicy`
 
-描述操作失败时的重试策略，供调用方自定义。
+Defines retry strategy for failed operations, customizable by callers.
 
-| 属性 | 类型 | 说明 |
+| Property | Type | Description |
 | :--- | :--- | :--- |
-| `maxRetries` | `Int` | 最大重试次数（默认 0） |
-| `delay` | `TimeInterval` | 重试间隔（秒，默认 0） |
-| `backoffMultiplier` | `Double` | 退避倍数（默认 1.0） |
+| `maxRetries` | `Int` | Maximum retry attempts (default: 0) |
+| `delay` | `TimeInterval` | Retry interval in seconds (default: 0) |
+| `backoffMultiplier` | `Double` | Backoff multiplier (default: 1.0) |
 
 ```swift
-// 预设策略
+// Preset policies
 static let none = RetryPolicy(maxRetries: 0, delay: 0, backoffMultiplier: 1.0)
-static let `default` = RetryPolicy.none  // 默认：不重试
+static let `default` = RetryPolicy.none  // Default: no retry
 static let standard = RetryPolicy(maxRetries: 3, delay: 0.5, backoffMultiplier: 2.0)
 static let aggressive = RetryPolicy(maxRetries: 5, delay: 0.2, backoffMultiplier: 1.5)
 ```
 
 ### 3.5 `BatchProxyResult`
 
-批量代理配置操作的结果。
+Result of batch proxy configuration operations.
 
-| 属性 | 类型 | 说明 |
+| Property | Type | Description |
 | :--- | :--- | :--- |
-| `succeeded` | `[String]` | 成功配置的服务列表 |
-| `failed` | `[(service: String, error: Error)]` | 失败的服务及错误 |
-| `allSucceeded` | `Bool` | 是否全部成功 |
-| `successCount` | `Int` | 成功操作数 |
-| `failureCount` | `Int` | 失败操作数 |
+| `succeeded` | `[String]` | Successfully configured services |
+| `failed` | `[(service: String, error: Error)]` | Failed services with errors |
+| `allSucceeded` | `Bool` | Whether all operations succeeded |
+| `successCount` | `Int` | Number of successful operations |
+| `failureCount` | `Int` | Number of failed operations |
 
 ### 3.6 `ServiceInfo`
 
-网络服务信息结构。
+Network service information structure.
 
-| 属性 | 类型 | 说明 |
+| Property | Type | Description |
 | :--- | :--- | :--- |
-| `name` | `String` | 服务名称（如 "Wi-Fi"、"Ethernet"） |
-| `bsdName` | `String?` | BSD 设备名（如 "en0"、"en1"） |
-| `rawInterfaceType` | `String?` | SystemConfiguration 原始接口类型（如 "IEEE80211"、"Ethernet"、"VPN"） |
-| `interfaceType` | `InterfaceType` | 简化的接口分类 |
-| `isEnabled` | `Bool` | 服务是否启用 |
+| `name` | `String` | Service name (e.g., "Wi-Fi", "Ethernet") |
+| `bsdName` | `String?` | BSD device name (e.g., "en0", "en1") |
+| `rawInterfaceType` | `String?` | Raw interface type from SystemConfiguration (e.g., "IEEE80211", "Ethernet", "VPN") |
+| `interfaceType` | `InterfaceType` | Simplified interface category |
+| `isEnabled` | `Bool` | Whether the service is enabled |
 
 ### 3.7 `InterfaceType`
 
-简化的网络接口类型枚举。
+Simplified network interface type category enum.
 
-| 枚举值 | 原始类型 | 说明 |
+| Case | Raw Types | Description |
 | :--- | :--- | :--- |
-| `.wifi` | IEEE80211 | Wi-Fi 接口 |
-| `.cellular` | WWAN | 蜂窝/移动网络 |
-| `.wiredEthernet` | Ethernet, FireWire | 有线连接（USB 以太网、雷电以太网等） |
-| `.bridge` | Bridge, Bond, VLAN | 桥接/聚合接口 |
-| `.loopback` | Loopback | 回环接口 |
-| `.vpn` | PPP, IPSec, L2TP, PPTP, 6to4, VPN | VPN 隧道（Surge、Shadowrocket、Tailscale 等） |
-| `.other` | Bluetooth, Modem, Serial 等 | 其他/未知类型 |
+| `.wifi` | IEEE80211 | Wi-Fi interfaces |
+| `.cellular` | WWAN | Cellular/mobile network |
+| `.wiredEthernet` | Ethernet, FireWire | Wired connections (USB Ethernet, Thunderbolt Ethernet, etc.) |
+| `.bridge` | Bridge, Bond, VLAN | Bridge/aggregated interfaces |
+| `.loopback` | Loopback | Loopback interface |
+| `.vpn` | PPP, IPSec, L2TP, PPTP, 6to4, VPN | VPN tunnels (Surge, Shadowrocket, Tailscale, etc.) |
+| `.other` | Bluetooth, Modem, Serial, etc. | Other/unknown types |
 
-**便捷属性：**
-- `isPhysical: Bool` - wifi、cellular、wiredEthernet 返回 `true`
-- `isVPN: Bool` - vpn 返回 `true`
-
------
-
-## 4\. 映射层设计 (Mapping Layer)
-
-**文件：** `Mapping/ProxyConfiguration+SC.swift`
-
-此层负责脏活累活，解决“Swift 强类型”与“C 弱类型字典”之间的阻抗匹配。
-
-### 功能点
-
-1.  **Serialization (Model -\> Dict):** 将 `ProxyConfiguration` 转换为 `[String: Any]`，用于 `SCNetworkProtocolSetConfiguration`。
-      * *细节：* 必须处理 `0/1` 与 `Bool` 的转换，以及处理空值（nil）。
-2.  **Deserialization (Dict -\> Model):** 将 `SCNetworkProtocolGetConfiguration` 返回的字典转换为 `ProxyConfiguration`。
-      * *细节：* 必须防御性编程，处理字段缺失的情况，提供默认值。
+**Convenience Properties:**
+- `isPhysical: Bool` - Returns `true` for wifi, cellular, wiredEthernet
+- `isVPN: Bool` - Returns `true` for vpn
 
 -----
 
-## 5\. 核心逻辑设计 (Core Logic)
+## 4. Mapping Layer Design
 
-> **并发模型：** 核心控制器使用 Swift Concurrency (`async/await`) 实现，所有公开 API 均为 `async throws`。
+**File:** `Mapping/ProxyConfiguration+SC.swift`
+
+This layer handles the impedance mismatch between "Swift strong typing" and "C weak-typed dictionaries".
+
+### Capabilities
+
+1. **Serialization (Model -> Dict):** Converts `ProxyConfiguration` to `[String: Any]` for `SCNetworkProtocolSetConfiguration`.
+   * *Details:* Must handle `0/1` to `Bool` conversion and nil values.
+2. **Deserialization (Dict -> Model):** Converts dictionaries returned by `SCNetworkProtocolGetConfiguration` to `ProxyConfiguration`.
+   * *Details:* Requires defensive programming to handle missing fields with default values.
+
+-----
+
+## 5. Core Logic Design
+
+> **Concurrency Model:** Core controller uses Swift Concurrency (`async/await`). All public APIs are `async throws`.
 
 ### 5.1 `NetworkServiceHelper`
 
-**职责：** 屏蔽 `SCNetworkService` 的查找细节。遵循 `Sendable` 协议。
+**Responsibility:** Abstract away `SCNetworkService` lookup details. Conforms to `Sendable`.
 
-  * **API:** `func findService(byName: String, in: SCPreferences) -> SCNetworkService?`
-  * **逻辑：** 遍历系统所有服务，对比 `SCNetworkServiceGetName`。
-  * **扩展性：** 未来可扩展为通过 BSD Name (如 `en0`) 查找。
+* **API:** `func findService(byName: String, in: SCPreferences) -> SCNetworkService?`
+* **Logic:** Iterates through all system services, comparing `SCNetworkServiceGetName`.
+* **Extensibility:** Can be extended to support lookup by BSD name (e.g., `en0`).
 
-### 5.2 `SystemProxyManager` (核心控制器)
+### 5.2 `SystemProxyManager` (Core Controller)
 
-**职责：** 事务管理、权限上下文持有、API 暴露。
+**Responsibility:** Transaction management, authorization context holding, API exposure.
 
-**线程安全：** 使用 `actor` 或内部串行队列确保并发安全，遵循 `Sendable` 约束。
+**Thread Safety:** Implemented as an `actor` to ensure concurrent safety, conforming to `Sendable`.
 
-#### 关键方法设计
+#### Key Method Design
 
-**1. 获取当前配置 (快照)**
+**1. Get Current Configuration (Snapshot)**
 
 ```swift
 func getConfiguration(for interface: String) async throws -> ProxyConfiguration
 ```
 
-  * **步骤：**
-    1.  创建临时只读 `SCPreferences` 会话。
-    2.  调用 Helper 找到目标服务。
-    3.  获取 Protocol Configuration 字典。
-    4.  调用 Mapping 层生成模型。
-    5.  **不** 执行 Lock 操作（读取无需锁）。
+* **Steps:**
+  1. Create temporary read-only `SCPreferences` session.
+  2. Use Helper to find target service.
+  3. Get Protocol Configuration dictionary.
+  4. Call Mapping layer to generate model.
+  5. **No** Lock operation needed (read-only access).
 
-**2. 应用配置 (覆盖)**
+**2. Apply Configuration (Override)**
 
 ```swift
 func setProxy(
@@ -239,61 +241,61 @@ func setProxy(
 ) async throws
 ```
 
-  * **前置条件：** 进程必须拥有 Root 权限 或 提供了有效的 `authRef`。
-  * **步骤：**
-    1.  `SCPreferencesCreateWithAuthorization` 创建会话。
-    2.  `SCPreferencesLock` **(关键点：必须锁定)**。
-       - 若锁定失败，根据 `retryPolicy` 进行重试（支持指数退避）。
-    3.  获取服务与 Protocol。
-    4.  调用 Mapping 层生成字典。
-    5.  `SCNetworkProtocolSetConfiguration` 写入内存。
-    6.  `SCPreferencesCommitChanges` 提交到数据库。
-    7.  `SCPreferencesApplyChanges` 通知系统生效。
-    8.  `SCPreferencesUnlock` 解锁。
+* **Precondition:** Process must have Root privileges or provide valid `authRef`.
+* **Steps:**
+  1. `SCPreferencesCreateWithAuthorization` to create session.
+  2. `SCPreferencesLock` **(critical: must lock)**.
+     - If lock fails, retry according to `retryPolicy` (with exponential backoff).
+  3. Get service and Protocol.
+  4. Call Mapping layer to generate dictionary.
+  5. `SCNetworkProtocolSetConfiguration` to write to memory.
+  6. `SCPreferencesCommitChanges` to persist to database.
+  7. `SCPreferencesApplyChanges` to notify system.
+  8. `SCPreferencesUnlock` to release lock.
 
-**3. 便捷静态方法**
+**3. Convenience Static Methods**
 
 ```swift
-// 获取代理配置（单个或批量）
+// Get proxy configuration (single or batch)
 static func getProxy(for interface: String) async throws -> ProxyConfiguration
 static func getProxy(for interfaces: [String]) async throws -> [(interface: String, config: ProxyConfiguration)]
 
-// 设置代理（单个或批量）
+// Set proxy (single or batch)
 static func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
 static func setProxy(_ config: ProxyConfiguration, for interfaces: [String]) async throws -> BatchProxyResult
 static func setProxy(_ config: ProxyConfiguration, for interfaceFilter: (ServiceInfo) -> Bool) async throws -> BatchProxyResult
 static func setProxy(configurations: [(interface: String, config: ProxyConfiguration)]) async throws -> BatchProxyResult
 ```
 
-> **批量操作：** 批量方法通过单次 `SCPreferencesCommitChanges` 和 `SCPreferencesApplyChanges` 调用来优化性能。
+> **Batch Operations:** Batch methods optimize performance by using a single `SCPreferencesCommitChanges` and `SCPreferencesApplyChanges` call for multiple services.
 
 -----
 
-## 6\. 错误处理设计 (Error Handling)
+## 6. Error Handling Design
 
-使用 Swift `Error` 枚举 `SystemProxyError` 统一抛出异常。
+Uses Swift `Error` enum `SystemProxyError` for unified exception throwing.
 
-| 错误枚举 | 触发场景 | 建议处理 |
+| Error Enum | Trigger Scenario | Suggested Handling |
 | :--- | :--- | :--- |
-| `preferencesCreationFailed` | 系统资源不足或权限严重拒绝 | 检查 App 签名或权限 |
-| `lockFailed` | 其他进程正在修改网络设置 | 稍后重试 |
-| `serviceNotFound(name)` | 用户输入的网卡名错误 (如 "Wi-Fi 2") | 提示用户检查网卡名称 |
-| `commitFailed` | 写入系统数据库失败 | 检查是否有 Root 权限 |
-| `applyFailed` | 配置写入成功但无法生效 | 提示用户重启网络服务 |
+| `preferencesCreationFailed` | System resource shortage or severe permission denial | Check app signature or permissions |
+| `lockFailed` | Another process is modifying network settings | Retry later |
+| `serviceNotFound(name)` | User-provided interface name is incorrect | Prompt user to check interface name |
+| `commitFailed` | Failed to write to system database | Check for root permissions |
+| `applyFailed` | Configuration written but failed to take effect | Suggest user restart network services |
 
 -----
 
-## 7\. 业务流程示例 (Business Workflow)
+## 7. Business Workflow Example
 
-这是业务方使用此库时的标准 **"安全修改模式"**：
+Standard **"Safe Modification Pattern"** for clients using this library:
 
 ```swift
 import SystemProxyKit
 
-// 1. 备份当前配置
+// 1. Backup current configuration
 let originalConfig = try await SystemProxyKit.getProxy(for: "Wi-Fi")
 
-// 2. 创建新配置
+// 2. Create new configuration
 let newProxy = ProxyServer(
     host: "127.0.0.1",
     port: 7890,
@@ -305,18 +307,18 @@ var newConfig = originalConfig
 newConfig.httpProxy = newProxy
 newConfig.httpsProxy = newProxy
 
-// 3. 应用配置（带自定义重试策略）
+// 3. Apply configuration (with custom retry policy)
 try await SystemProxyKit.setProxy(
     newConfig,
     for: "Wi-Fi",
     retryPolicy: .default
 )
 
-// 4. 恢复原始配置（当业务结束时）
+// 4. Restore original configuration (when business completes)
 try await SystemProxyKit.setProxy(originalConfig, for: "Wi-Fi")
 ```
 
-### PAC 配置示例
+### PAC Configuration Example
 
 ```swift
 var config = try await SystemProxyKit.getProxy(for: "Wi-Fi")
@@ -329,18 +331,18 @@ try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
 
 -----
 
-## 8\. 待办事项与风险 (TODO & Risks)
+## 8. TODO & Risks
 
-1.  ~~**多网卡并发：** 目前设计是针对单网卡。~~ **已解决：** 批量 API 现已支持多网卡，通过单次 commit/apply 优化性能。
-2.  **权限上下文：** 虽然库不负责实现 XPC，但 API 设计中预留了 `authRef` 入口，确保未来接入 `Security.framework` 时无需破坏性重构 API。
-3.  **IPv6 支持：** 确认 `SystemConfiguration` 中对于 IPv6 字面量地址的解析是否存在坑（通常由系统底层处理，但需留意）。
-4.  **Keychain 集成：** 代理认证密码的安全存储需要后续版本集成 Keychain 服务，当前版本暂时使用内存存储。
+1. ~~**Multi-Interface Concurrency:** Current design targets single interface.~~ **RESOLVED:** Batch APIs now support multiple interfaces with optimized single commit/apply.
+2. **Authorization Context:** While the library doesn't implement XPC, the API design reserves an `authRef` entry point to ensure non-breaking API integration with `Security.framework` in the future.
+3. **IPv6 Support:** Verify that `SystemConfiguration` properly handles IPv6 literal addresses (typically handled by system layer, but worth attention).
+4. **Keychain Integration:** Secure storage of proxy authentication passwords requires Keychain integration in future versions; current version uses in-memory storage.
 
 ---
 
-## 9\. 协议遵循清单 (Protocol Conformance)
+## 9. Protocol Conformance Checklist
 
-| 类型 | 遵循的协议 |
+| Type | Conforms To |
 | :--- | :--- |
 | `ProxyServer` | `Equatable`, `Hashable`, `Sendable`, `Codable` |
 | `PACConfiguration` | `Equatable`, `Hashable`, `Sendable`, `Codable` |
@@ -348,4 +350,4 @@ try await SystemProxyKit.setProxy(config, for: "Wi-Fi")
 | `BatchProxyResult` | `Sendable` |
 | `RetryPolicy` | `Equatable`, `Sendable` |
 | `SystemProxyError` | `Error`, `Sendable` |
-| `SystemProxyManager` | `Sendable` (通过 `actor` 实现) |
+| `SystemProxyManager` | `Sendable` (via `actor`) |

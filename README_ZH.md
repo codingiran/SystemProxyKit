@@ -31,7 +31,7 @@ sudo sysproxy set http --host 127.0.0.1 --port 7890 --interface Wi-Fi
 sudo sysproxy disable Wi-Fi
 ```
 
-详细 CLI 使用说明请参阅 [CLI_Guide.md](./CLI_Guide.md)。
+详细 CLI 使用说明请参阅 [CLI_Guide.md](./CLI_Guide_ZH.md)。
 
 ## 系统要求
 
@@ -208,7 +208,7 @@ SystemProxyKit 采用分层架构：
 - **Utils**：错误定义和常量
 - **Interface**：公共 API 入口
 
-详细技术设计请参阅 [Implement.md](./Implement.md)。
+详细技术设计请参阅 [Implement.md](./Implement_ZH.md)。
 
 ## 许可证
 
