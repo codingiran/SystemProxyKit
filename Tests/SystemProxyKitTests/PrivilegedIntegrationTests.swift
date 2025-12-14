@@ -288,8 +288,8 @@ struct PrivilegedProxyWriteTests {
         print("✅ Empty configurations handled correctly")
     }
 
-    @Test("Set proxy for all enabled services convenience method")
-    func setProxyForAllEnabledServices() async throws {
+    @Test("Set proxy for services matching filter")
+    func setProxyWithFilter() async throws {
         if skipIfNotRoot() { return }
 
         // Get enabled services count
@@ -312,10 +312,10 @@ struct PrivilegedProxyWriteTests {
         var testConfig = ProxyConfiguration()
         testConfig.socksProxy = ProxyServer(host: "127.0.0.1", port: 21080, isEnabled: true)
 
-        // Use convenience method
-        let result = try await SystemProxyKit.setProxyForAllEnabledServices(testConfig)
+        // Use filter-based method for enabled services
+        let result = try await SystemProxyKit.setProxy(testConfig, for: { $0.isEnabled })
 
-        print("Set proxy for all enabled services result: \(result)")
+        print("Set proxy with filter result: \(result)")
         #expect(result.successCount > 0)
 
         // Restore all configurations

@@ -231,8 +231,8 @@ static func getProxy(for interfaces: [String]) async throws -> [(interface: Stri
 // 设置代理（单个或批量）
 static func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
 static func setProxy(_ config: ProxyConfiguration, for interfaces: [String]) async throws -> BatchProxyResult
+static func setProxy(_ config: ProxyConfiguration, for interfaceFilter: (ServiceInfo) -> Bool) async throws -> BatchProxyResult
 static func setProxy(configurations: [(interface: String, config: ProxyConfiguration)]) async throws -> BatchProxyResult
-static func setProxyForAllEnabledServices(_ config: ProxyConfiguration) async throws -> BatchProxyResult
 ```
 
 > **批量操作：** 批量方法通过单次 `SCPreferencesCommitChanges` 和 `SCPreferencesApplyChanges` 调用来优化性能。
