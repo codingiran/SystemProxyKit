@@ -96,6 +96,82 @@ public enum NetworkServiceHelper: Sendable {
     }
 }
 
+// MARK: - Interface Type
+
+public extension NetworkServiceHelper {
+    /// Simplified network interface type category
+    enum InterfaceType: String, Sendable, CaseIterable {
+        /// Wi-Fi (IEEE 802.11)
+        case wifi
+        /// Cellular/WWAN
+        case cellular
+        /// Wired Ethernet (including USB Ethernet, Thunderbolt Ethernet)
+        case wiredEthernet
+        /// Bridge interface (including Thunderbolt Bridge, Bond)
+        case bridge
+        /// Loopback interface
+        case loopback
+        /// VPN (PPP, IPSec, L2TP, etc.)
+        case vpn
+        /// Other/Unknown interface type
+        case other
+
+        /// Initialize from raw SystemConfiguration interface type string
+        /// - Parameter rawType: The raw interface type string from SCNetworkInterfaceGetInterfaceType
+        public init(rawType: String?) {
+            guard let rawType else {
+                self = .other
+                return
+            }
+
+            switch rawType {
+            // Wi-Fi
+            case "IEEE80211":
+                self = .wifi
+
+            // Cellular
+            case "WWAN":
+                self = .cellular
+
+            // Wired Ethernet (covers USB Ethernet, Thunderbolt Ethernet, built-in Ethernet)
+            case "Ethernet", "FireWire":
+                self = .wiredEthernet
+
+            // Bridge/Bond interfaces
+            case "Bond", "Bridge", "VLAN":
+                self = .bridge
+
+            // Loopback
+            case "Loopback":
+                self = .loopback
+
+            // VPN types
+            case "PPP", "IPSec", "L2TP", "PPTP", "6to4", "VPN":
+                self = .vpn
+
+            // Others (Bluetooth, Serial, Modem, IrDA, etc.)
+            default:
+                self = .other
+            }
+        }
+
+        /// Whether this is a physical network interface (Wi-Fi, Cellular, or Wired Ethernet)
+        public var isPhysical: Bool {
+            switch self {
+            case .wifi, .cellular, .wiredEthernet:
+                return true
+            case .bridge, .loopback, .vpn, .other:
+                return false
+            }
+        }
+
+        /// Whether this is a VPN interface
+        public var isVPN: Bool {
+            self == .vpn
+        }
+    }
+}
+
 // MARK: - Service Info
 
 public extension NetworkServiceHelper {
@@ -107,8 +183,11 @@ public extension NetworkServiceHelper {
         /// BSD device name
         public let bsdName: String?
 
-        /// Interface type (e.g., IEEE80211, Ethernet)
-        public let interfaceType: String?
+        /// Raw interface type string from SystemConfiguration (e.g., "IEEE80211", "Ethernet")
+        public let rawInterfaceType: String?
+
+        /// Simplified interface type category
+        public let interfaceType: InterfaceType
 
         /// Whether the service is enabled
         public let isEnabled: Bool
@@ -129,12 +208,14 @@ public extension NetworkServiceHelper {
 
             let interface = SCNetworkServiceGetInterface(service)
             let bsdName = interface.flatMap { SCNetworkInterfaceGetBSDName($0) as String? }
-            let interfaceType = interface.flatMap { SCNetworkInterfaceGetInterfaceType($0) as String? }
+            let rawInterfaceType = interface.flatMap { SCNetworkInterfaceGetInterfaceType($0) as String? }
+            let interfaceType = InterfaceType(rawType: rawInterfaceType)
             let isEnabled = SCNetworkServiceGetEnabled(service)
 
             return ServiceInfo(
                 name: name,
                 bsdName: bsdName,
+                rawInterfaceType: rawInterfaceType,
                 interfaceType: interfaceType,
                 isEnabled: isEnabled
             )

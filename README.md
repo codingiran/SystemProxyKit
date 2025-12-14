@@ -83,7 +83,12 @@ print("Succeeded: \(result.succeeded), Failed: \(result.failed.count)")
 
 // Or use filter to set for specific services (e.g., enabled physical interfaces)
 let result = try await SystemProxyKit.setProxy(config, for: { service in
-    service.isEnabled && service.interfaceType != "PPP"  // Exclude VPN
+    service.isEnabled && service.interfaceType.isPhysical  // Wi-Fi, Ethernet, Cellular only
+})
+
+// Or exclude VPN services (Surge, Shadowrocket, etc.)
+let result = try await SystemProxyKit.setProxy(config, for: {
+    $0.isEnabled && !$0.interfaceType.isVPN
 })
 ```
 
@@ -117,6 +122,10 @@ try await SystemProxyKit.setProxy(original, for: "Wi-Fi")
 - **`ProxyServer`**: Individual proxy server with optional authentication
 - **`PACConfiguration`**: PAC (Proxy Auto-Configuration) settings
 - **`BatchProxyResult`**: Result of batch operations with succeeded/failed lists
+- **`ServiceInfo`**: Network service information with `name`, `bsdName`, `rawInterfaceType`, `interfaceType`, `isEnabled`
+- **`InterfaceType`**: Simplified interface category enum: `.wifi`, `.cellular`, `.wiredEthernet`, `.bridge`, `.loopback`, `.vpn`, `.other`
+  - `isPhysical`: Returns `true` for wifi, cellular, wiredEthernet
+  - `isVPN`: Returns `true` for vpn
 - **`RetryPolicy`**: Configurable retry strategy (default: no retry)
 
 ### Main APIs

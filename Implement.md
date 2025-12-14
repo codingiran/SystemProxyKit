@@ -148,6 +148,36 @@ static let aggressive = RetryPolicy(maxRetries: 5, delay: 0.2, backoffMultiplier
 | `successCount` | `Int` | 成功操作数 |
 | `failureCount` | `Int` | 失败操作数 |
 
+### 3.6 `ServiceInfo`
+
+网络服务信息结构。
+
+| 属性 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `name` | `String` | 服务名称（如 "Wi-Fi"、"Ethernet"） |
+| `bsdName` | `String?` | BSD 设备名（如 "en0"、"en1"） |
+| `rawInterfaceType` | `String?` | SystemConfiguration 原始接口类型（如 "IEEE80211"、"Ethernet"、"VPN"） |
+| `interfaceType` | `InterfaceType` | 简化的接口分类 |
+| `isEnabled` | `Bool` | 服务是否启用 |
+
+### 3.7 `InterfaceType`
+
+简化的网络接口类型枚举。
+
+| 枚举值 | 原始类型 | 说明 |
+| :--- | :--- | :--- |
+| `.wifi` | IEEE80211 | Wi-Fi 接口 |
+| `.cellular` | WWAN | 蜂窝/移动网络 |
+| `.wiredEthernet` | Ethernet, FireWire | 有线连接（USB 以太网、雷电以太网等） |
+| `.bridge` | Bridge, Bond, VLAN | 桥接/聚合接口 |
+| `.loopback` | Loopback | 回环接口 |
+| `.vpn` | PPP, IPSec, L2TP, PPTP, 6to4, VPN | VPN 隧道（Surge、Shadowrocket、Tailscale 等） |
+| `.other` | Bluetooth, Modem, Serial 等 | 其他/未知类型 |
+
+**便捷属性：**
+- `isPhysical: Bool` - wifi、cellular、wiredEthernet 返回 `true`
+- `isVPN: Bool` - vpn 返回 `true`
+
 -----
 
 ## 4\. 映射层设计 (Mapping Layer)
