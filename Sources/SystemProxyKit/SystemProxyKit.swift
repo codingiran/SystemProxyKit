@@ -12,8 +12,8 @@ import Foundation
     #error("SystemProxyKit doesn't support Swift versions below 5.10.")
 #endif
 
-/// Current SystemProxyKit version Release 0.0.4. Necessary since SPM doesn't use dynamic libraries. Plus this will be more accurate.
-public let version = "0.0.4"
+/// Current SystemProxyKit version Release 0.0.5. Necessary since SPM doesn't use dynamic libraries. Plus this will be more accurate.
+public let version = "0.0.5"
 
 /// Unified entry point for SystemProxyKit library
 /// Provides convenient static methods for accessing common functionality
