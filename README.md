@@ -81,8 +81,10 @@ config.httpProxy = ProxyServer(host: "127.0.0.1", port: 7890, isEnabled: true)
 let result = try await SystemProxyKit.setProxy(config, for: ["Wi-Fi", "Ethernet", "Thunderbolt Bridge"])
 print("Succeeded: \(result.succeeded), Failed: \(result.failed.count)")
 
-// Or set for all enabled services
-let result = try await SystemProxyKit.setProxyForAllEnabledServices(config)
+// Or use filter to set for specific services (e.g., enabled physical interfaces)
+let result = try await SystemProxyKit.setProxy(config, for: { service in
+    service.isEnabled && service.interfaceType != "PPP"  // Exclude VPN
+})
 ```
 
 ### PAC Configuration
@@ -127,8 +129,8 @@ func getProxy(for interfaces: [String]) async throws -> [(interface: String, con
 // Set proxy configuration (single or batch)
 func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
 func setProxy(_ config: ProxyConfiguration, for interfaces: [String]) async throws -> BatchProxyResult
+func setProxy(_ config: ProxyConfiguration, for interfaceFilter: (ServiceInfo) -> Bool) async throws -> BatchProxyResult
 func setProxy(configurations: [(interface: String, config: ProxyConfiguration)]) async throws -> BatchProxyResult
-func setProxyForAllEnabledServices(_ config: ProxyConfiguration) async throws -> BatchProxyResult
 
 // List network services
 func availableServices() async throws -> [String]

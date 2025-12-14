@@ -97,19 +97,21 @@ public enum SystemProxyKit {
         )
     }
 
-    /// Sets the same proxy configuration for all enabled network services
+    /// Sets the same proxy configuration for network services matching the filter
     /// - Parameters:
     ///   - config: Proxy configuration to apply
+    ///   - interfaceFilter: Filter closure to select which services to configure
     ///   - retryPolicy: Retry policy, defaults to .default
     /// - Returns: BatchProxyResult containing succeeded and failed services
     /// - Throws: SystemProxyError
-    public static func setProxyForAllEnabledServices(
+    public static func setProxy(
         _ config: ProxyConfiguration,
+        for interfaceFilter: @escaping @Sendable (NetworkServiceHelper.ServiceInfo) -> Bool,
         retryPolicy: RetryPolicy = .default
     ) async throws -> BatchProxyResult {
         let services = try await allServicesInfo()
-        let enabledServices = services.filter { $0.isEnabled }.map { $0.name }
-        let configurations = enabledServices.map { (interface: $0, config: config) }
+        let matchedServices = services.filter(interfaceFilter).map { $0.name }
+        let configurations = matchedServices.map { (interface: $0, config: config) }
         return try await setProxy(configurations: configurations, retryPolicy: retryPolicy)
     }
 

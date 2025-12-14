@@ -233,8 +233,8 @@ static func getProxy(for interfaces: [String]) async throws -> [(interface: Stri
 // Set proxy (single or batch)
 static func setProxy(_ config: ProxyConfiguration, for interface: String) async throws
 static func setProxy(_ config: ProxyConfiguration, for interfaces: [String]) async throws -> BatchProxyResult
+static func setProxy(_ config: ProxyConfiguration, for interfaceFilter: (ServiceInfo) -> Bool) async throws -> BatchProxyResult
 static func setProxy(configurations: [(interface: String, config: ProxyConfiguration)]) async throws -> BatchProxyResult
-static func setProxyForAllEnabledServices(_ config: ProxyConfiguration) async throws -> BatchProxyResult
 ```
 
 > **Batch Operations:** Batch methods optimize performance by using a single `SCPreferencesCommitChanges` and `SCPreferencesApplyChanges` call for multiple services.
