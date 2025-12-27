@@ -47,7 +47,7 @@ sudo sysproxy disable Wi-Fi
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/codingiran/SystemProxyKit.git", from: "1.0.0")
+    .package(url: "https://github.com/codingiran/SystemProxyKit.git", from: "0.0.5")
 ]
 ```
 
